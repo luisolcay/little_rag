@@ -1,0 +1,14 @@
+# Entornos virtuales
+venv/
+rag_env/
+
+# Archivos locales
+.env
+**/.env
+*.log
+*.pyc
+__pycache__/
+.vscode
+*.db
+chroma_db
+cllh_db
