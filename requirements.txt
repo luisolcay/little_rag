@@ -1,27 +1,47 @@
 # =========================
-# Core dependencies
+# Core
 # =========================
 pydantic>=2.7,<3
 pydantic-core>=2
+python-dotenv>=1.0.1
+tiktoken>=0.7,<1
 
 # =========================
-# LangChain ecosystem
+# FastAPI / API
+# =========================
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+python-multipart>=0.0.9     # uploads
+aiosqlite>=0.20,<1         
+SQLAlchemy>=2.0,<3          
+
+# =========================
+# Streamlit (UI)
+# =========================
+streamlit>=1.32,<2
+
+# =========================
+# LangChain ecosystem (RAG)
 # =========================
 langchain>=0.3.4,<0.4
 langchain-community>=0.3.2,<0.4
 langchain-core>=0.3.9,<0.4
 langchain-openai>=0.2.0,<0.3
 langchain-text-splitters>=0.3.0,<0.4
-langchain_chroma
+langchain_chroma>=0.2.6
+
+# Vector DB / Embeddings (útil)
+chromadb>=1.0.20,<2
+sentence-transformers>=3.0,<4
+numpy>=1.26,<3
+httpx>=0.27,<1               #  HTTP clients that use LangChain/OpenAI
 
 # =========================
-# Document loaders
+# Document loaders / parsing
 # =========================
-docx2txt>=0.8   # para leer archivos .docx
-pypdf>=4.0      # backend usado por PyPDFLoader
-
+docx2txt>=0.8
+pypdf>=4.0                   #
 # =========================
 # Utilities
 # =========================
 pandas>=2.2,<3
-python-dotenv>=1.0.1
