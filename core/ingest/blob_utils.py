@@ -14,9 +14,9 @@ def get_blob_service_client() -> BlobServiceClient:
     """
     Create a BlobServiceClient for the storage account using AAD authentication. 
     """
-    account_url = os.getenv("AZURE_BLOB_ACCOUNT_URL")
+    account_url = os.getenv("AZURE_BLOB_ENDPOINT")
     if not account_url:
-        raise BlobStorageError("AZURE_BLOB_ACCOUNT_URL not set in environment")
+        raise BlobStorageError("AZURE_BLOB_ENDPOINT not set in environment")
     credential = DefaultAzureCredential()
     try:
         return BlobServiceClient(account_url=account_url, credential=credential)
