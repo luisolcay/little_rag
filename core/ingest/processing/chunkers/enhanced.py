@@ -23,7 +23,8 @@ class EnhancedHybridChunker(HybridChunker):
     def __init__(self,
                  extractor=None,
                  splitter=None,
-                 ocr_provider=None,
+                 docling_provider=None,  # NEW
+                 azure_provider=None,     # Renamed from ocr_provider
                  max_tokens: int = 900,
                  overlap_tokens: int = 120,
                  ocr_threshold: float = 0.1,
@@ -47,7 +48,8 @@ class EnhancedHybridChunker(HybridChunker):
         super().__init__(
             extractor=extractor,
             splitter=splitter,
-            ocr_provider=ocr_provider,
+            docling_provider=docling_provider,
+            azure_provider=azure_provider,
             max_tokens=max_tokens,
             overlap_tokens=overlap_tokens,
             ocr_threshold=ocr_threshold,

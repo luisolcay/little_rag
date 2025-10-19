@@ -12,6 +12,41 @@ class BaseOcrProvider:
         raise NotImplementedError
 
 
+class DoclingOcrProvider(BaseOcrProvider):
+    """
+    OCR using IBM Docling - preserves document structure and semantics.
+    Works on CPU, better for complex documents with tables/structure.
+    """
+    def __init__(self, use_ocr: bool = True):
+        try:
+            from docling.document_converter import DocumentConverter
+            self.converter = DocumentConverter()
+            self.use_ocr = use_ocr
+        except ImportError as e:
+            raise ImportError(f"Docling not installed. Run: pip install docling>=1.0.0 docling-core>=1.0.0. Error: {e}")
+    
+    def extract_text(self, local_path: str) -> str:
+        """Legacy method - extracts all text as single string."""
+        pages = self.extract_text_per_page(local_path)
+        return "\n".join(text for text, _ in pages)
+
+    def extract_text_per_page(self, local_path: str) -> List[Tuple[str, int]]:
+        """Extract text per page with structure preservation"""
+        try:
+            result = self.converter.convert(local_path)
+            pages_text = []
+            
+            # Docling returns structured markdown
+            for page_num, page in enumerate(result.pages, start=1):
+                # Get markdown representation (preserves tables, headings)
+                page_text = page.export_to_markdown()
+                pages_text.append((page_text, page_num))
+            
+            return pages_text if pages_text else [("", 1)]
+        except Exception as e:
+            raise Exception(f"Docling OCR failed for {local_path}: {e}")
+
+
 class AzureDocumentIntelligenceOcrProvider(BaseOcrProvider):
     """
     OCR using Azure Document Intelligence (Form Recognizer).

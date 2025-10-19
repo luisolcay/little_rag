@@ -50,6 +50,15 @@ class BaseChunker:
         all_empty = all(not (t.strip()) for t, _ in pages)
         return bool(self.ocr_provider) and (doc_file.needs_ocr or (ext == ".pdf" and all_empty))
 
+    def _is_complex_document(self, pages: List[Tuple[str, int]]) -> bool:
+        """Detect if document has tables or complex structure"""
+        for text, _ in pages[:3]:  # Check first 3 pages
+            # Look for table indicators
+            if any(indicator in text.lower() for indicator in 
+                   ['table', 'figura', 'cuadro', 'tabla', '|', '─', '┌', '┐', '└', '┘']):
+                return True
+        return False
+
     def _make_document_id(self, doc_file: DocumentFile) -> str:
         """Generate a deterministic document ID."""
         import hashlib, json
@@ -127,13 +136,17 @@ class HybridChunker(BaseChunker):
         self,
         extractor: BaseExtractor | None = None,
         splitter: BaseSplitter | None = None,
-        ocr_provider: BaseOcrProvider | None = None,
+        docling_provider: BaseOcrProvider | None = None,  # NEW
+        azure_provider: BaseOcrProvider | None = None,     # Renamed from ocr_provider
         max_tokens: int = 900,
         overlap_tokens: int = 120,
         ocr_threshold: float = 0.1,
         min_text_length: int = 50,
     ):
-        super().__init__(extractor, splitter, ocr_provider, max_tokens, overlap_tokens, ocr_threshold, min_text_length)
+        # Use azure_provider as the main ocr_provider for backward compatibility
+        super().__init__(extractor, splitter, azure_provider, max_tokens, overlap_tokens, ocr_threshold, min_text_length)
+        self.docling_provider = docling_provider
+        self.azure_provider = azure_provider
 
     def _analyze_page_text_quality(self, text: str) -> Dict[str, Any]:
         """Analyze text quality to determine if OCR is needed."""
@@ -195,14 +208,14 @@ class HybridChunker(BaseChunker):
             pages = self.extractor.extract(doc_file.local_path)
             print(f"[HYBRID] Native extraction: {len(pages)} pages")
             
-            # 2️⃣ Analyze each page and decide OCR strategy
+            # 2️⃣ Intelligent OCR selection (3-tier approach)
             processed_pages = []
             ocr_pages_needed = []
             
             for page_text, page_no in pages:
                 analysis = self._analyze_page_text_quality(page_text)
                 
-                if analysis["needs_ocr"] and self.ocr_provider:
+                if analysis["needs_ocr"]:
                     print(f"[HYBRID] Page {page_no} needs OCR: {analysis['reason']}")
                     ocr_pages_needed.append(page_no)
                     # Keep original for now, will replace with OCR later
@@ -211,22 +224,54 @@ class HybridChunker(BaseChunker):
                     print(f"[HYBRID] Page {page_no} OK: {analysis['reason']} ({analysis['text_length']} chars)")
                     processed_pages.append((page_text, page_no, analysis))
             
-            # 3️⃣ Run OCR only for pages that need it
-            if ocr_pages_needed and self.ocr_provider:
-                print(f"[HYBRID] Running OCR for pages: {ocr_pages_needed}")
-                try:
-                    ocr_pages = self.ocr_provider.extract_text_per_page(doc_file.local_path)
-                    ocr_dict = {page_no: text for text, page_no in ocr_pages}
-                    
-                    # Replace pages that needed OCR
-                    for i, (page_text, page_no, analysis) in enumerate(processed_pages):
-                        if page_no in ocr_dict:
-                            new_text = ocr_dict[page_no]
-                            new_analysis = self._analyze_page_text_quality(new_text)
-                            processed_pages[i] = (new_text, page_no, new_analysis)
-                            print(f"[HYBRID] OCR completed for page {page_no}: {new_analysis['text_length']} chars")
-                except Exception as e:
-                    print(f"[HYBRID] OCR failed: {e}, using native extraction")
+            # 3️⃣ Run intelligent OCR selection
+            if ocr_pages_needed:
+                is_complex = self._is_complex_document(pages)
+                
+                if is_complex and self.docling_provider:
+                    print(f"[HYBRID] Using Docling OCR for complex document")
+                    try:
+                        ocr_pages = self.docling_provider.extract_text_per_page(doc_file.local_path)
+                        ocr_dict = {page_no: text for text, page_no in ocr_pages}
+                        
+                        # Replace pages that needed OCR
+                        for i, (page_text, page_no, analysis) in enumerate(processed_pages):
+                            if page_no in ocr_dict:
+                                new_text = ocr_dict[page_no]
+                                new_analysis = self._analyze_page_text_quality(new_text)
+                                processed_pages[i] = (new_text, page_no, new_analysis)
+                                print(f"[HYBRID] Docling OCR completed for page {page_no}: {new_analysis['text_length']} chars")
+                    except Exception as e:
+                        print(f"[HYBRID] Docling failed, falling back to Azure: {e}")
+                        if self.azure_provider:
+                            try:
+                                ocr_pages = self.azure_provider.extract_text_per_page(doc_file.local_path)
+                                ocr_dict = {page_no: text for text, page_no in ocr_pages}
+                                
+                                # Replace pages that needed OCR
+                                for i, (page_text, page_no, analysis) in enumerate(processed_pages):
+                                    if page_no in ocr_dict:
+                                        new_text = ocr_dict[page_no]
+                                        new_analysis = self._analyze_page_text_quality(new_text)
+                                        processed_pages[i] = (new_text, page_no, new_analysis)
+                                        print(f"[HYBRID] Azure OCR completed for page {page_no}: {new_analysis['text_length']} chars")
+                            except Exception as e2:
+                                print(f"[HYBRID] Azure OCR also failed: {e2}, using native extraction")
+                elif self.azure_provider:
+                    print(f"[HYBRID] Using Azure OCR for standard document")
+                    try:
+                        ocr_pages = self.azure_provider.extract_text_per_page(doc_file.local_path)
+                        ocr_dict = {page_no: text for text, page_no in ocr_pages}
+                        
+                        # Replace pages that needed OCR
+                        for i, (page_text, page_no, analysis) in enumerate(processed_pages):
+                            if page_no in ocr_dict:
+                                new_text = ocr_dict[page_no]
+                                new_analysis = self._analyze_page_text_quality(new_text)
+                                processed_pages[i] = (new_text, page_no, new_analysis)
+                                print(f"[HYBRID] Azure OCR completed for page {page_no}: {new_analysis['text_length']} chars")
+                    except Exception as e:
+                        print(f"[HYBRID] Azure OCR failed: {e}, using native extraction")
             
             # 4️⃣ Generate chunks with metadata
             out: List[Chunk] = []

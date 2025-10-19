@@ -20,7 +20,7 @@ from .text_processing import (
     BaseExtractor, AutoExtractor, PdfExtractor, DocxExtractor, HtmlExtractor, TxtExtractor,
     BaseSplitter, TokenAwareSentenceSplitter, SemanticOverlapSplitter,
     normalize_text,
-    BaseOcrProvider, AzureDocumentIntelligenceOcrProvider,
+    BaseOcrProvider, AzureDocumentIntelligenceOcrProvider, DoclingOcrProvider,
 )
 
 # Analysis
@@ -40,7 +40,7 @@ __all__ = [
     "BaseExtractor", "AutoExtractor", "PdfExtractor", "DocxExtractor", "HtmlExtractor", "TxtExtractor",
     "BaseSplitter", "TokenAwareSentenceSplitter", "SemanticOverlapSplitter",
     "normalize_text",
-    "BaseOcrProvider", "AzureDocumentIntelligenceOcrProvider",
+    "BaseOcrProvider", "AzureDocumentIntelligenceOcrProvider", "DoclingOcrProvider",
     
     # Analysis
     "ChunkQualityValidator", "ReferencePreserver",

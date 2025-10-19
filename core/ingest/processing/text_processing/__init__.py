@@ -15,11 +15,11 @@ from .extractors import (
 from .splitter import BaseSplitter, TokenAwareSentenceSplitter
 from .splitters import SemanticOverlapSplitter
 from .cleaning import normalize_text
-from .ocr import BaseOcrProvider, AzureDocumentIntelligenceOcrProvider
+from .ocr import BaseOcrProvider, AzureDocumentIntelligenceOcrProvider, DoclingOcrProvider
 
 __all__ = [
     "BaseExtractor", "AutoExtractor", "PdfExtractor", "DocxExtractor", "HtmlExtractor", "TxtExtractor",
     "BaseSplitter", "TokenAwareSentenceSplitter", "SemanticOverlapSplitter",
     "normalize_text",
-    "BaseOcrProvider", "AzureDocumentIntelligenceOcrProvider",
+    "BaseOcrProvider", "AzureDocumentIntelligenceOcrProvider", "DoclingOcrProvider",
 ]
