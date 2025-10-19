@@ -136,7 +136,7 @@ class ReferencePreserver:
         for implicit_ref in implicit_refs:
             context_info.append({
                 'reference_type': 'implicit',
-                'reference_text': implicit_ref['text'],
+                'reference_value': implicit_ref['text'],
                 'reference_position': implicit_ref['position'],
                 'reference_context': implicit_ref['context']
             })
