@@ -41,7 +41,14 @@ httpx>=0.27,<1               #  HTTP clients that use LangChain/OpenAI
 # =========================
 docx2txt>=0.8
 pypdf>=4.0 
-docling               
+docling>=1.0.0
+docling-core>=1.0.0
+# =========================
+# Azure AI Search
+# =========================
+azure-search-documents>=11.4,<12
+azure-core>=1.29,<2
+
 # =========================
 # Utilities
 # =========================
