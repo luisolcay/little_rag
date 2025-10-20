@@ -40,6 +40,15 @@ def list_blobs_in_container(container_name: str, prefix: str = "") -> list[str]:
     except Exception as e:
         raise BlobStorageError(f"Error listing blobs in container '{container_name}' with prefix '{prefix}': {e}")
 
+def upload_blob_from_bytes(container_name: str, blob_name: str, data: bytes, overwrite: bool = True) -> str:
+    """Upload bytes data to blob storage and return blob URL."""
+    svc = get_blob_service_client()
+    container = svc.get_container_client(container_name)
+    blob = container.get_blob_client(blob_name)
+    
+    blob.upload_blob(data, overwrite=overwrite)
+    return blob.url
+
 def download_blob_to_file(container_name: str, blob_name: str, download_path: str, overwrite: bool = False) -> None:
     """
     Download a blob from the given container to a local file path.
