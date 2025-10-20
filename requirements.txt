@@ -50,10 +50,19 @@ azure-search-documents>=11.4,<12
 azure-core>=1.29,<2
 
 # =========================
+# Azure Cosmos DB
+azure-cosmos>=4.5,<5
+
+# Redis
+redis>=5.0,<6
+redis[hiredis]>=5.0  # C parser for better performance
+
+# Additional LangChain
+langchain-experimental>=0.0.60  # Structured outputs
+
 # Utilities
-# =========================
+jinja2>=3.1,<4  # Prompt templating
 pandas>=2.2,<3
 azure-storage-blob 
 azure-identity
-azure
 pdfminer.six
