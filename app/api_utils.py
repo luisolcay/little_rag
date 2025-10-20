@@ -1,14 +1,16 @@
 import requests
 import streamlit as st
 
-def get_api_response(question, session_id, model):
+def get_api_response(question, session_id, model, use_context=True):
+    """Get API response with context control."""
     headers = {
         'accept': 'application/json',
         'Content-Type': 'application/json'
     }
     data = {
         "question": question,
-        "model": model
+        "model": model,
+        "use_context": use_context
     }
     if session_id:
         data["session_id"] = session_id
@@ -23,6 +25,32 @@ def get_api_response(question, session_id, model):
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
         return None
+
+def get_index_status():
+    """Get Azure AI Search index status."""
+    try:
+        response = requests.get("http://localhost:8000/index/status")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error(f"Failed to get index status. Error: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        st.error(f"Error getting index status: {e}")
+        return None
+
+def get_documents_list():
+    """Get list of documents from Cosmos DB."""
+    try:
+        response = requests.get("http://localhost:8000/documents")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error(f"Failed to fetch document list. Error: {response.status_code} - {response.text}")
+            return {"documents": [], "total": 0}
+    except Exception as e:
+        st.error(f"An error occurred while fetching the document list: {str(e)}")
+        return {"documents": [], "total": 0}
 
 def upload_document(file):
     print("Uploading file...")
