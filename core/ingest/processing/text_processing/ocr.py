@@ -56,7 +56,7 @@ class AzureDocumentIntelligenceOcrProvider(BaseOcrProvider):
         load_dotenv()
         self.endpoint = endpoint or os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
         self.model_id = model_id or os.getenv("AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID")
-        api_key = api_key or os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")
+        api_key = api_key or os.getenv("AZURE_DOCUMENT_INTELLIGENCE_API_KEY")
         if not self.endpoint:
             raise ValueError("Missing AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
 
