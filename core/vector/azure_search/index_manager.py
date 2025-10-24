@@ -41,7 +41,7 @@ class IndexManager:
         self,
         endpoint: Optional[str] = None,
         api_key: Optional[str] = None,
-        index_name: str = "collahuasi-documents"
+        index_name: str = "orbe-documents"
     ):
         """
         Initialize Index Manager.
@@ -78,7 +78,7 @@ class IndexManager:
     
     def create_index_schema(self) -> SearchIndex:
         """
-        Create the search index schema for Collahuasi documents.
+        Create the search index schema for Orbe documents.
         
         Returns:
             SearchIndex object with complete configuration
@@ -396,17 +396,17 @@ class IndexManager:
             return None
 
 # Convenience functions
-def create_collahuasi_index(index_name: str = "collahuasi-documents") -> bool:
-    """Create the Collahuasi documents index."""
+def create_collahuasi_index(index_name: str = "orbe-documents") -> bool:
+    """Create the Orbe documents index."""
     manager = IndexManager(index_name=index_name)
     return manager.create_index()
 
-def delete_collahuasi_index(index_name: str = "collahuasi-documents") -> bool:
-    """Delete the Collahuasi documents index."""
+def delete_collahuasi_index(index_name: str = "orbe-documents") -> bool:
+    """Delete the Orbe documents index."""
     manager = IndexManager(index_name=index_name)
     return manager.delete_index()
 
-def index_exists(index_name: str = "collahuasi-documents") -> bool:
-    """Check if the Collahuasi documents index exists."""
+def index_exists(index_name: str = "orbe-documents") -> bool:
+    """Check if the Orbe documents index exists."""
     manager = IndexManager(index_name=index_name)
     return manager.index_exists()

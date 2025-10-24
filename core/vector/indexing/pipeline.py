@@ -28,7 +28,7 @@ class IndexingPipeline:
     def __init__(
         self,
         chunks_file: str = "artifacts/chunks.jsonl",
-        index_name: str = "collahuasi-documents",
+        index_name: str = "orbe-documents",
         batch_size: int = 100,
         show_progress: bool = True
     ):
@@ -280,7 +280,7 @@ class IndexingPipeline:
 # Convenience function
 async def index_chunks(
     chunks_file: str = "artifacts/chunks.jsonl",
-    index_name: str = "collahuasi-documents",
+    index_name: str = "orbe-documents",
     batch_size: int = 100
 ) -> Dict[str, Any]:
     """

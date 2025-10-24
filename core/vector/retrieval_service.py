@@ -47,7 +47,7 @@ class AdvancedRetrievalService:
     
     def __init__(
         self,
-        index_name: str = "collahuasi-documents",
+        index_name: str = "orbe-documents",
         embedding_model: str = "text-embedding-3-large"
     ):
         """
@@ -384,7 +384,7 @@ async def search_documents(
     query: str,
     filters: Optional[Dict[str, Any]] = None,
     top_k: int = 10,
-    index_name: str = "collahuasi-documents"
+    index_name: str = "orbe-documents"
 ) -> RetrievalResult:
     """
     Convenience function for document search.

@@ -160,11 +160,11 @@ class QueryClassifier:
             )
             
         except Exception as e:
-            logger.error(f"Query analysis failed: {e}")
+            print(f"Query analysis failed: {e}")
             # Fallback to standard strategy
             return QueryAnalysis(
                 query=query,
-                query_type="general",
+                query_type="general_qa",
                 complexity=QueryComplexity.MODERATE,
                 entities=[],
                 temporal_indicators=[],
@@ -247,15 +247,15 @@ class QueryClassifier:
                              temporal_indicators: List[str]) -> str:
         """Determine the type of query."""
         if regulatory_keywords and temporal_indicators:
-            return "regulatory_temporal"
+            return "compliance"
         elif regulatory_keywords:
-            return "regulatory"
+            return "compliance"
         elif technical_keywords:
-            return "technical"
+            return "technical_analysis"
         elif temporal_indicators:
-            return "temporal"
+            return "general_qa"
         else:
-            return "general"
+            return "general_qa"
     
     def _select_strategy(self, query: str, entities: List[str], 
                         temporal_indicators: List[str], 

@@ -57,7 +57,7 @@ class AzureSearchClient:
         self,
         endpoint: Optional[str] = None,
         api_key: Optional[str] = None,
-        index_name: str = "collahuasi-documents"
+        index_name: str = "orbe-documents"
     ):
         """
         Initialize Azure Search Client.
