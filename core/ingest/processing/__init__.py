@@ -1,50 +1,84 @@
 """
-Document processing module with enhanced chunking capabilities.
-
-This module provides a comprehensive document processing pipeline with:
-- Intelligent hybrid chunking with OCR fallback
-- Quality validation and filtering
-- Semantic overlap preservation
-- Reference detection and linking
-- Multiple text extraction methods
+Processing module for document ingestion and chunking.
 """
 
-# Core models
-from .models import Chunk, ChunkerError, HybridChunkerError, EnhancedChunkerError
-
-# Chunkers
-from .chunkers import BaseChunker, HybridChunker, EnhancedHybridChunker
-
-# Text processing
-from .text_processing import (
-    BaseExtractor, AutoExtractor, PdfExtractor, DocxExtractor, HtmlExtractor, TxtExtractor,
-    BaseSplitter, TokenAwareSentenceSplitter, SemanticOverlapSplitter,
-    normalize_text,
-    BaseOcrProvider, AzureDocumentIntelligenceOcrProvider, DoclingOcrProvider,
+from .models import DocumentFile, Chunk
+from .text_processing.ocr import (
+    BaseOcrProvider, 
+    AzureDocumentIntelligenceOcrProvider, 
+    DoclingOcrProvider,
+    TesseractOcrProvider,
+    HybridOcrProvider
+)
+from .text_processing.extractors import (
+    BaseExtractor,
+    PyMuPDFExtractor,
+    TesseractExtractor,
+    HybridExtractor
+)
+from .text_processing.splitters import (
+    BaseSplitter,
+    TokenBasedSplitter,
+    SemanticOverlapSplitter,
+    AdaptiveSplitter
+)
+from .chunkers.base import BaseChunker, HybridChunker
+from .chunkers.enhanced import EnhancedHybridChunker
+from .analysis.quality_validator import ChunkQualityValidator
+from .analysis.reference_preserver import ReferencePreserver
+from .pattern_detector import RepetitivePatternDetector
+from .header_filter import (
+    BaseHeaderFilter,
+    HeaderFilter, 
+    CorporateHeaderFilter, 
+    AcademicHeaderFilter, 
+    LegalHeaderFilter, 
+    DocumentTypeDetector, 
+    get_header_filter_for_document
 )
 
-# Analysis
-from .analysis import ChunkQualityValidator, ReferencePreserver
-
-# Utils
-from .utils import deterministic_chunk_id
-
 __all__ = [
-    # Core models
-    "Chunk", "ChunkerError", "HybridChunkerError", "EnhancedChunkerError",
+    # Models
+    'DocumentFile',
+    'Chunk',
+    
+    # OCR Providers
+    'BaseOcrProvider',
+    'AzureDocumentIntelligenceOcrProvider',
+    'DoclingOcrProvider',
+    'TesseractOcrProvider',
+    'HybridOcrProvider',
+    
+    # Extractors
+    'BaseExtractor',
+    'PyMuPDFExtractor',
+    'TesseractExtractor',
+    'HybridExtractor',
+    
+    # Splitters
+    'BaseSplitter',
+    'TokenBasedSplitter',
+    'SemanticOverlapSplitter',
+    'AdaptiveSplitter',
     
     # Chunkers
-    "BaseChunker", "HybridChunker", "EnhancedHybridChunker",
-    
-    # Text processing
-    "BaseExtractor", "AutoExtractor", "PdfExtractor", "DocxExtractor", "HtmlExtractor", "TxtExtractor",
-    "BaseSplitter", "TokenAwareSentenceSplitter", "SemanticOverlapSplitter",
-    "normalize_text",
-    "BaseOcrProvider", "AzureDocumentIntelligenceOcrProvider", "DoclingOcrProvider",
+    'BaseChunker',
+    'HybridChunker',
+    'EnhancedHybridChunker',
     
     # Analysis
-    "ChunkQualityValidator", "ReferencePreserver",
+    'ChunkQualityValidator',
+    'ReferencePreserver',
     
-    # Utils
-    "deterministic_chunk_id",
+    # Pattern Detection
+    'RepetitivePatternDetector',
+    
+    # Header Filtering
+    'BaseHeaderFilter',
+    'HeaderFilter',
+    'CorporateHeaderFilter',
+    'AcademicHeaderFilter',
+    'LegalHeaderFilter',
+    'DocumentTypeDetector',
+    'get_header_filter_for_document'
 ]

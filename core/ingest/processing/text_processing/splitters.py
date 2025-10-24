@@ -1,168 +1,367 @@
+"""
+Advanced Text Splitting Utilities
+=================================
+
+This module provides sophisticated text splitting algorithms
+for optimal document chunking with semantic preservation.
+"""
+
 import re
-from typing import List
-from .splitter import BaseSplitter
+import tiktoken
+from typing import List, Tuple, Optional
+from abc import ABC, abstractmethod
 
-
-class SemanticOverlapSplitter(BaseSplitter):
-    """Splitter with semantic-aware overlap preservation"""
+class BaseSplitter(ABC):
+    """Base class for text splitters."""
     
-    def __init__(self, max_tokens: int = 900, overlap_sentences: int = 2, 
-                 preserve_paragraphs: bool = True):
+    @abstractmethod
+    def split_text(self, text: str) -> List[str]:
+        """Split text into chunks."""
+        pass
+
+class TokenBasedSplitter(BaseSplitter):
+    """
+    Token-based text splitter with overlap.
+    
+    Features:
+    - Accurate token counting using tiktoken
+    - Configurable overlap for context preservation
+    - Sentence boundary awareness
+    - Performance optimization
+    """
+    
+    def __init__(self, max_tokens: int = 900, overlap_tokens: int = 120, model: str = "gpt-4"):
         self.max_tokens = max_tokens
-        self.overlap_sentences = overlap_sentences
-        self.preserve_paragraphs = preserve_paragraphs
-        self.encoder = None
+        self.overlap_tokens = overlap_tokens
+        self.model = model
         
-        # Load tokenizer
         try:
-            import tiktoken
-            self.encoder = tiktoken.encoding_for_model("gpt-4o-mini")
-        except ImportError:
-            pass
+            self.encoding = tiktoken.encoding_for_model(model)
+        except KeyError:
+            # Fallback to cl100k_base encoding
+            self.encoding = tiktoken.get_encoding("cl100k_base")
     
-    def _count_tokens(self, text: str) -> int:
-        """Count tokens using tiktoken or fallback to character count"""
-        if self.encoder:
-            return len(self.encoder.encode(text))
-        return len(text)  # Fallback to characters
-    
-    def _split_by_sentences(self, text: str) -> List[str]:
-        """Split text into sentences preserving punctuation"""
-        # Enhanced sentence splitting that handles various cases
-        sentences = re.split(r'(?<=[.!?])\s+(?=[A-Za-zÁÉÍÓÚÜÑ0-9])', text)
-        return [s.strip() for s in sentences if s.strip()]
-    
-    def _split_by_paragraphs(self, text: str) -> List[str]:
-        """Split text into paragraphs"""
-        paragraphs = re.split(r'\n\s*\n', text)
-        return [p.strip() for p in paragraphs if p.strip()]
-    
-    def _is_paragraph_boundary(self, text: str, position: int) -> bool:
-        """Check if position is at a paragraph boundary"""
-        if position == 0 or position >= len(text):
-            return False
+    def split_text(self, text: str) -> List[str]:
+        """
+        Split text into token-based chunks with overlap.
         
-        # Look for double newlines or significant whitespace
-        before = text[max(0, position-10):position]
-        after = text[position:min(len(text), position+10)]
-        
-        return '\n\n' in before or '\n\n' in after
-    
-    def _should_preserve_structure(self, text: str) -> bool:
-        """Determine if text has structural elements worth preserving"""
-        # Check for common structural patterns
-        structural_patterns = [
-            r'^\d+\.\s+',  # Numbered lists
-            r'^[A-Z][a-z]+:',  # Headers
-            r'^\*\s+',  # Bullet points
-            r'^-\s+',  # Dashes
-            r'^\s*[A-Z][A-Z\s]+$',  # ALL CAPS headers
-        ]
-        
-        lines = text.split('\n')
-        structural_lines = 0
-        
-        for line in lines[:10]:  # Check first 10 lines
-            for pattern in structural_patterns:
-                if re.match(pattern, line.strip()):
-                    structural_lines += 1
-                    break
-        
-        return structural_lines >= 2
-    
-    def split(self, text: str) -> List[str]:
-        """Split text with semantic overlap and structure preservation"""
+        Args:
+            text: Input text to split
+            
+        Returns:
+            List of text chunks
+        """
         if not text.strip():
             return []
         
-        # Determine splitting strategy based on content
-        has_structure = self._should_preserve_structure(text)
-        
-        if has_structure and self.preserve_paragraphs:
-            return self._split_with_paragraph_awareness(text)
-        else:
-            return self._split_with_sentence_awareness(text)
-    
-    def _split_with_sentence_awareness(self, text: str) -> List[str]:
-        """Split text using sentence boundaries with semantic overlap"""
-        sentences = self._split_by_sentences(text)
-        if not sentences:
-            return [text]
+        # Split into sentences first
+        sentences = self._split_into_sentences(text)
         
         chunks = []
         current_chunk = []
         current_tokens = 0
         
-        for i, sentence in enumerate(sentences):
-            sentence_tokens = self._count_tokens(sentence)
+        for sentence in sentences:
+            sentence_tokens = len(self.encoding.encode(sentence))
             
-            # Check if adding this sentence exceeds limit
+            # Check if adding this sentence would exceed max tokens
             if current_tokens + sentence_tokens > self.max_tokens and current_chunk:
-                # Create current chunk
+                # Create chunk from current sentences
                 chunk_text = ' '.join(current_chunk)
                 chunks.append(chunk_text)
                 
-                # Create semantic overlap
-                overlap_sentences = current_chunk[-self.overlap_sentences:]
-                current_chunk = overlap_sentences + [sentence]
-                current_tokens = sum(self._count_tokens(s) for s in current_chunk)
-            else:
-                current_chunk.append(sentence)
-                current_tokens += sentence_tokens
+                # Start new chunk with overlap
+                current_chunk, current_tokens = self._create_overlap_chunk(current_chunk)
+            
+            current_chunk.append(sentence)
+            current_tokens += sentence_tokens
         
-        # Add final chunk
+        # Add final chunk if it has content
         if current_chunk:
             chunk_text = ' '.join(current_chunk)
             chunks.append(chunk_text)
         
         return chunks
     
-    def _split_with_paragraph_awareness(self, text: str) -> List[str]:
-        """Split text preserving paragraph structure"""
-        paragraphs = self._split_by_paragraphs(text)
-        if not paragraphs:
-            return [text]
+    def _split_into_sentences(self, text: str) -> List[str]:
+        """Split text into sentences."""
+        # Enhanced sentence splitting regex
+        sentence_pattern = r'(?<=[.!?])\s+(?=[A-Z])'
+        sentences = re.split(sentence_pattern, text)
         
+        # Clean and filter sentences
+        cleaned_sentences = []
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if sentence and len(sentence) > 10:  # Skip very short sentences
+                cleaned_sentences.append(sentence)
+        
+        return cleaned_sentences
+    
+    def _create_overlap_chunk(self, previous_chunk: List[str]) -> Tuple[List[str], int]:
+        """Create overlap chunk from previous chunk."""
+        if not previous_chunk:
+            return [], 0
+        
+        overlap_chunk = []
+        overlap_tokens = 0
+        
+        # Add sentences from the end of previous chunk until we reach overlap_tokens
+        for sentence in reversed(previous_chunk):
+            sentence_tokens = len(self.encoding.encode(sentence))
+            
+            if overlap_tokens + sentence_tokens <= self.overlap_tokens:
+                overlap_chunk.insert(0, sentence)
+                overlap_tokens += sentence_tokens
+            else:
+                break
+        
+        return overlap_chunk, overlap_tokens
+
+class SemanticOverlapSplitter(BaseSplitter):
+    """
+    Semantic-aware text splitter with intelligent overlap.
+    
+    Features:
+    - Semantic boundary detection
+    - Paragraph preservation
+    - Context-aware splitting
+    - Quality optimization
+    """
+    
+    def __init__(
+        self, 
+        max_tokens: int = 900, 
+        overlap_sentences: int = 2, 
+        preserve_paragraphs: bool = True,
+        model: str = "gpt-4"
+    ):
+        self.max_tokens = max_tokens
+        self.overlap_sentences = overlap_sentences
+        self.preserve_paragraphs = preserve_paragraphs
+        self.model = model
+        
+        try:
+            self.encoding = tiktoken.encoding_for_model(model)
+        except KeyError:
+            self.encoding = tiktoken.get_encoding("cl100k_base")
+    
+    def split_text(self, text: str) -> List[str]:
+        """
+        Split text with semantic awareness and overlap.
+        
+        Args:
+            text: Input text to split
+            
+        Returns:
+            List of semantically coherent chunks
+        """
+        if not text.strip():
+            return []
+        
+        # Split into paragraphs if preserve_paragraphs is enabled
+        if self.preserve_paragraphs:
+            paragraphs = self._split_into_paragraphs(text)
+            chunks = self._split_paragraphs_into_chunks(paragraphs)
+        else:
+            # Direct sentence-based splitting
+            sentences = self._split_into_sentences(text)
+            chunks = self._split_sentences_into_chunks(sentences)
+        
+        return chunks
+    
+    def _split_into_paragraphs(self, text: str) -> List[str]:
+        """Split text into paragraphs."""
+        # Split by double newlines
+        paragraphs = re.split(r'\n\s*\n', text)
+        
+        # Clean paragraphs
+        cleaned_paragraphs = []
+        for para in paragraphs:
+            para = para.strip()
+            if para and len(para) > 20:  # Skip very short paragraphs
+                cleaned_paragraphs.append(para)
+        
+        return cleaned_paragraphs
+    
+    def _split_into_sentences(self, text: str) -> List[str]:
+        """Split text into sentences."""
+        sentence_pattern = r'(?<=[.!?])\s+(?=[A-Z])'
+        sentences = re.split(sentence_pattern, text)
+        
+        cleaned_sentences = []
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if sentence and len(sentence) > 10:
+                cleaned_sentences.append(sentence)
+        
+        return cleaned_sentences
+    
+    def _split_paragraphs_into_chunks(self, paragraphs: List[str]) -> List[str]:
+        """Split paragraphs into chunks while preserving paragraph boundaries."""
         chunks = []
         current_chunk = []
         current_tokens = 0
         
-        for i, paragraph in enumerate(paragraphs):
-            paragraph_tokens = self._count_tokens(paragraph)
+        for para in paragraphs:
+            para_tokens = len(self.encoding.encode(para))
             
-            # Check if adding this paragraph exceeds limit
-            if current_tokens + paragraph_tokens > self.max_tokens and current_chunk:
-                # Create current chunk
-                chunk_text = '\n\n'.join(current_chunk)
-                chunks.append(chunk_text)
+            # If single paragraph exceeds max tokens, split it
+            if para_tokens > self.max_tokens:
+                # Flush current chunk if it has content
+                if current_chunk:
+                    chunks.append('\n\n'.join(current_chunk))
+                    current_chunk = []
+                    current_tokens = 0
                 
-                # For paragraphs, use smaller overlap
-                overlap_paragraphs = current_chunk[-1:] if len(current_chunk) > 1 else []
-                current_chunk = overlap_paragraphs + [paragraph]
-                current_tokens = sum(self._count_tokens(p) for p in current_chunk)
-            else:
-                current_chunk.append(paragraph)
-                current_tokens += paragraph_tokens
+                # Split the large paragraph
+                para_chunks = self._split_large_paragraph(para)
+                chunks.extend(para_chunks)
+                continue
+            
+            # Check if adding this paragraph would exceed max tokens
+            if current_tokens + para_tokens > self.max_tokens and current_chunk:
+                chunks.append('\n\n'.join(current_chunk))
+                
+                # Create overlap chunk
+                current_chunk, current_tokens = self._create_paragraph_overlap(current_chunk)
+            
+            current_chunk.append(para)
+            current_tokens += para_tokens
         
         # Add final chunk
         if current_chunk:
-            chunk_text = '\n\n'.join(current_chunk)
-            chunks.append(chunk_text)
+            chunks.append('\n\n'.join(current_chunk))
         
         return chunks
     
-    def get_split_statistics(self, text: str) -> dict:
-        """Get statistics about the splitting process"""
-        sentences = self._split_by_sentences(text)
-        paragraphs = self._split_by_paragraphs(text)
-        chunks = self.split(text)
+    def _split_sentences_into_chunks(self, sentences: List[str]) -> List[str]:
+        """Split sentences into chunks."""
+        chunks = []
+        current_chunk = []
+        current_tokens = 0
         
-        return {
-            'original_length': len(text),
-            'sentence_count': len(sentences),
-            'paragraph_count': len(paragraphs),
-            'chunk_count': len(chunks),
-            'average_chunk_length': sum(len(c) for c in chunks) / len(chunks) if chunks else 0,
-            'has_structure': self._should_preserve_structure(text),
-            'preserve_paragraphs': self.preserve_paragraphs
-        }
+        for sentence in sentences:
+            sentence_tokens = len(self.encoding.encode(sentence))
+            
+            if current_tokens + sentence_tokens > self.max_tokens and current_chunk:
+                chunks.append(' '.join(current_chunk))
+                
+                # Create overlap chunk
+                current_chunk, current_tokens = self._create_sentence_overlap(current_chunk)
+            
+            current_chunk.append(sentence)
+            current_tokens += sentence_tokens
+        
+        # Add final chunk
+        if current_chunk:
+            chunks.append(' '.join(current_chunk))
+        
+        return chunks
+    
+    def _split_large_paragraph(self, paragraph: str) -> List[str]:
+        """Split a large paragraph into smaller chunks."""
+        sentences = self._split_into_sentences(paragraph)
+        return self._split_sentences_into_chunks(sentences)
+    
+    def _create_paragraph_overlap(self, previous_chunk: List[str]) -> Tuple[List[str], int]:
+        """Create paragraph overlap chunk."""
+        if not previous_chunk:
+            return [], 0
+        
+        overlap_chunk = []
+        overlap_tokens = 0
+        
+        # Add paragraphs from the end until we reach overlap threshold
+        for para in reversed(previous_chunk):
+            para_tokens = len(self.encoding.encode(para))
+            
+            if overlap_tokens + para_tokens <= self.max_tokens * 0.3:  # 30% overlap
+                overlap_chunk.insert(0, para)
+                overlap_tokens += para_tokens
+            else:
+                break
+        
+        return overlap_chunk, overlap_tokens
+    
+    def _create_sentence_overlap(self, previous_chunk: List[str]) -> Tuple[List[str], int]:
+        """Create sentence overlap chunk."""
+        if not previous_chunk:
+            return [], 0
+        
+        overlap_chunk = []
+        overlap_tokens = 0
+        
+        # Add sentences from the end until we reach overlap_sentences
+        for sentence in reversed(previous_chunk[-self.overlap_sentences:]):
+            sentence_tokens = len(self.encoding.encode(sentence))
+            
+            if overlap_tokens + sentence_tokens <= self.max_tokens * 0.3:
+                overlap_chunk.insert(0, sentence)
+                overlap_tokens += sentence_tokens
+            else:
+                break
+        
+        return overlap_chunk, overlap_tokens
+
+class AdaptiveSplitter(BaseSplitter):
+    """
+    Adaptive splitter that chooses the best splitting strategy.
+    
+    Features:
+    - Automatic strategy selection
+    - Content type detection
+    - Quality optimization
+    - Performance monitoring
+    """
+    
+    def __init__(self, max_tokens: int = 900, overlap_tokens: int = 120):
+        self.max_tokens = max_tokens
+        self.overlap_tokens = overlap_tokens
+        
+        # Initialize different splitters
+        self.token_splitter = TokenBasedSplitter(max_tokens, overlap_tokens)
+        self.semantic_splitter = SemanticOverlapSplitter(max_tokens, overlap_tokens // 60)
+    
+    def split_text(self, text: str) -> List[str]:
+        """
+        Split text using the most appropriate strategy.
+        
+        Args:
+            text: Input text to split
+            
+        Returns:
+            List of optimally split chunks
+        """
+        if not text.strip():
+            return []
+        
+        # Analyze text characteristics
+        text_type = self._analyze_text_type(text)
+        
+        # Choose appropriate splitter
+        if text_type == 'structured':
+            # Use semantic splitter for structured content
+            return self.semantic_splitter.split_text(text)
+        else:
+            # Use token-based splitter for general content
+            return self.token_splitter.split_text(text)
+    
+    def _analyze_text_type(self, text: str) -> str:
+        """Analyze text to determine its type."""
+        # Check for structured content indicators
+        structured_indicators = [
+            r'\d+\.\s+',  # Numbered lists
+            r'•\s+',      # Bullet points
+            r'-\s+',      # Dashes
+            r'\n\s*\n',   # Multiple paragraphs
+            r'Table\s+\d+',  # Table references
+            r'Figure\s+\d+', # Figure references
+        ]
+        
+        structured_score = sum(1 for pattern in structured_indicators if re.search(pattern, text))
+        
+        if structured_score >= 2:
+            return 'structured'
+        else:
+            return 'general'

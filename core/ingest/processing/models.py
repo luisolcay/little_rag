@@ -1,111 +1,57 @@
 """
-Core data models for document processing and chunking.
-
-This module contains the fundamental data structures used throughout
-the processing pipeline, including the Chunk class and related exceptions.
+Data models for document processing.
 """
 
-from typing import Dict, Any
-from .utils.ids import deterministic_chunk_id
+from dataclasses import dataclass, field
+from typing import Dict, Any, Optional, List
+from datetime import datetime
+import uuid
 
+@dataclass
+class DocumentFile:
+    """Represents a document file ready for processing."""
+    
+    local_path: str
+    blob_name: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    needs_ocr: bool = False
+    
+    def __post_init__(self):
+        if not self.metadata:
+            self.metadata = {}
 
-class ChunkerError(Exception):
-    """Raised when something goes wrong during the chunking process."""
-    pass
-
-
-class HybridChunkerError(Exception):
-    """Raised when something goes wrong during the hybrid chunking process."""
-    pass
-
-
-class EnhancedChunkerError(Exception):
-    """Raised when something goes wrong during the enhanced chunking process."""
-    pass
-
-
+@dataclass
 class Chunk:
-    """
-    Represents a text chunk ready for embedding/indexing.
+    """Represents a text chunk with metadata."""
     
-    This is the unified Chunk class used throughout the processing pipeline.
-    It contains the chunk content, metadata, and automatically generates
-    a deterministic ID based on the metadata.
-    """
+    content: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     
-    def __init__(self, content: str, metadata: Dict[str, Any]):
-        """
-        Initialize a new chunk.
+    def __post_init__(self):
+        if not self.metadata:
+            self.metadata = {}
         
-        Args:
-            content: The text content of the chunk
-            metadata: Dictionary containing metadata about the chunk
-        """
-        self.content = content
-        self.metadata = metadata
-        self.id = deterministic_chunk_id(metadata)
-
-    def to_langchain_document(self) -> Dict[str, Any]:
-        """
-        Returns a LangChain-style document dict.
+        # Add default metadata if not present
+        if 'created_at' not in self.metadata:
+            self.metadata['created_at'] = datetime.now().isoformat()
         
-        Returns:
-            Dictionary with 'page_content' and 'metadata' keys
-        """
-        return {"page_content": self.content, "metadata": self.metadata}
-
-    def __repr__(self):
-        """String representation of the chunk."""
-        return f"Chunk(id={self.id}, metadata={self.metadata})"
+        if 'chunk_length' not in self.metadata:
+            self.metadata['chunk_length'] = len(self.content)
     
-    def __str__(self):
-        """String representation showing content preview."""
-        content_preview = self.content[:100] + "..." if len(self.content) > 100 else self.content
-        return f"Chunk(id={self.id}, content='{content_preview}')"
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert chunk to dictionary."""
+        return {
+            'id': self.id,
+            'content': self.content,
+            'metadata': self.metadata
+        }
     
-    def get_quality_score(self) -> float:
-        """
-        Get the quality score from metadata if available.
-        
-        Returns:
-            Quality score (0.0-1.0) or 0.0 if not available
-        """
-        if 'quality_metrics' in self.metadata:
-            return self.metadata['quality_metrics'].get('quality_score', 0.0)
-        return 0.0
-    
-    def has_references(self) -> bool:
-        """
-        Check if this chunk contains references.
-        
-        Returns:
-            True if chunk has references, False otherwise
-        """
-        return self.metadata.get('has_references', False)
-    
-    def get_page_number(self) -> int:
-        """
-        Get the page number from metadata.
-        
-        Returns:
-            Page number or 0 if not available
-        """
-        return self.metadata.get('page_number', 0)
-    
-    def get_document_id(self) -> str:
-        """
-        Get the document ID from metadata.
-        
-        Returns:
-            Document ID or empty string if not available
-        """
-        return self.metadata.get('document_id', '')
-    
-    def get_blob_name(self) -> str:
-        """
-        Get the blob name from metadata.
-        
-        Returns:
-            Blob name or empty string if not available
-        """
-        return self.metadata.get('document_blob', '')
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Chunk':
+        """Create chunk from dictionary."""
+        return cls(
+            id=data.get('id', str(uuid.uuid4())),
+            content=data['content'],
+            metadata=data.get('metadata', {})
+        )

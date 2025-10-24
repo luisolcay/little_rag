@@ -1,5 +1,6 @@
 """
-Enhanced hybrid chunker with quality validation, semantic overlap, and reference preservation.
+Enhanced hybrid chunker with quality validation, semantic overlap, reference preservation,
+and automatic repetitive pattern detection.
 
 This module contains the production-ready enhanced chunker that combines
 all advanced features for optimal document processing.
@@ -8,17 +9,20 @@ all advanced features for optimal document processing.
 import os
 import time
 from typing import List, Tuple, Dict, Any
+from datetime import datetime
 
 from .base import HybridChunker
 from ..models import Chunk
 from ..analysis.quality_validator import ChunkQualityValidator
 from ..text_processing.splitters import SemanticOverlapSplitter
 from ..analysis.reference_preserver import ReferencePreserver
-from ...file_loader import DocumentFile
+from ..pattern_detector import RepetitivePatternDetector
+from ..header_filter import get_header_filter_for_document
+from ..models import Chunk, DocumentFile
 
 
 class EnhancedHybridChunker(HybridChunker):
-    """Enhanced version with quality validation, semantic overlap, and reference preservation"""
+    """Enhanced version with quality validation, semantic overlap, reference preservation, and pattern detection"""
     
     def __init__(self,
                  extractor=None,
@@ -41,6 +45,11 @@ class EnhancedHybridChunker(HybridChunker):
                  preserve_paragraphs: bool = True,
                  # Reference preservation settings
                  enable_reference_preservation: bool = True,
+                 # Pattern detection settings
+                 enable_pattern_detection: bool = True,
+                 pattern_similarity_threshold: float = 0.8,
+                 auto_clean_headers: bool = True,
+                 noise_threshold: float = 15.0,  # Auto-clean if noise > 15%
                  # Logging settings
                  verbose: bool = True):
         
@@ -75,9 +84,17 @@ class EnhancedHybridChunker(HybridChunker):
         # Initialize reference preserver
         self.reference_preserver = ReferencePreserver()
         
+        # Initialize pattern detector
+        self.pattern_detector = RepetitivePatternDetector(
+            similarity_threshold=pattern_similarity_threshold
+        )
+        
         # Configuration
         self.min_quality_threshold = min_quality_threshold
         self.enable_reference_preservation = enable_reference_preservation
+        self.enable_pattern_detection = enable_pattern_detection
+        self.auto_clean_headers = auto_clean_headers
+        self.noise_threshold = noise_threshold
         self.verbose = verbose
         
         # Statistics tracking
@@ -86,11 +103,14 @@ class EnhancedHybridChunker(HybridChunker):
             'total_chunks_generated': 0,
             'total_chunks_filtered': 0,
             'average_quality_score': 0.0,
-            'reference_coverage': 0.0
+            'reference_coverage': 0.0,
+            'pattern_detection_enabled': enable_pattern_detection,
+            'total_noise_reduction': 0.0,
+            'documents_with_cleaning': 0
         }
     
     def chunk_document(self, doc_file: DocumentFile) -> List[Chunk]:
-        """Process document with all enhancements"""
+        """Process document with all enhancements including pattern detection"""
         if self.verbose:
             print(f"[ENHANCED] Processing: {doc_file.blob_name}")
         
@@ -101,6 +121,10 @@ class EnhancedHybridChunker(HybridChunker):
         
         if self.verbose:
             print(f"[ENHANCED] Base chunking generated {len(chunks)} chunks")
+        
+        # Step 0: Pattern Detection and Header Cleaning (if enabled)
+        if self.enable_pattern_detection:
+            chunks = self._apply_pattern_detection_and_cleaning(chunks, doc_file)
         
         # Step 1: Enhance chunks with reference context
         if self.enable_reference_preservation:
@@ -265,3 +289,102 @@ class EnhancedHybridChunker(HybridChunker):
         if not self.enable_reference_preservation:
             return "Reference preservation is disabled"
         return self.reference_preserver.generate_reference_report(chunks)
+    
+    def _apply_pattern_detection_and_cleaning(self, chunks: List[Chunk], doc_file: DocumentFile) -> List[Chunk]:
+        """
+        Applies repetitive pattern detection and automatic header cleaning.
+        
+        Args:
+            chunks: List of original chunks
+            doc_file: Processed document file
+            
+        Returns:
+            List of chunks with cleaning applied if necessary
+        """
+        if self.verbose:
+            print("[ENHANCED] Detecting repetitive patterns...")
+        
+        # Convert chunks to format for analysis
+        chunks_data = [
+            {'content': chunk.content, 'metadata': chunk.metadata} 
+            for chunk in chunks
+        ]
+        
+        # Detect repetitive patterns
+        pattern_analysis = self.pattern_detector.detect_repetitive_content(chunks_data)
+        
+        # Get noise statistics
+        noise_percentage = pattern_analysis['statistics'].get('noise_percentage', 0)
+        
+        if self.verbose:
+            print(f"[ENHANCED] Pattern analysis: {noise_percentage:.1f}% noise detected")
+            print(f"[ENHANCED] Similarity patterns: {pattern_analysis['statistics']['similarity_patterns_count']}")
+            print(f"[ENHANCED] Common lines: {pattern_analysis['statistics']['common_lines_count']}")
+        
+        # Apply automatic cleaning if noise exceeds threshold
+        cleaned_chunks = chunks
+        cleaning_applied = False
+        
+        if self.auto_clean_headers and noise_percentage > self.noise_threshold:
+            if self.verbose:
+                print(f"[ENHANCED] Applying automatic cleaning (noise: {noise_percentage:.1f}% > {self.noise_threshold}%)")
+            
+            # Get appropriate filter for document type
+            sample_content = chunks[0].content if chunks else ""
+            header_filter = get_header_filter_for_document(sample_content)
+            
+            # Apply cleaning to each chunk
+            cleaned_chunks = []
+            total_noise_reduction = 0
+            
+            for chunk in chunks:
+                original_length = len(chunk.content)
+                cleaned_content = header_filter.clean_content(chunk.content)
+                noise_reduction = original_length - len(cleaned_content)
+                total_noise_reduction += noise_reduction
+                
+                # Create new chunk with cleaned content
+                cleaned_chunk = Chunk(
+                    content=cleaned_content,
+                    metadata={
+                        **chunk.metadata,
+                        'cleaning_applied': True,
+                        'original_length': original_length,
+                        'cleaned_length': len(cleaned_content),
+                        'noise_reduction': noise_reduction,
+                        'pattern_analysis': {
+                            'noise_percentage': noise_percentage,
+                            'similarity_patterns': pattern_analysis['statistics']['similarity_patterns_count'],
+                            'common_lines': pattern_analysis['statistics']['common_lines_count']
+                        }
+                    }
+                )
+                cleaned_chunks.append(cleaned_chunk)
+            
+            cleaning_applied = True
+            
+            if self.verbose:
+                avg_reduction = total_noise_reduction / len(chunks) if chunks else 0
+                print(f"[ENHANCED] Cleaning completed: {avg_reduction:.0f} characters average removed per chunk")
+        
+        # Save pattern analysis report
+        if self.enable_pattern_detection:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            report_file = f"pattern_analysis_{doc_file.blob_name}_{timestamp}.json"
+            self.pattern_detector.save_analysis_report(report_file)
+            
+            # Add analysis information to first chunk metadata
+            if cleaned_chunks:
+                cleaned_chunks[0].metadata['pattern_analysis_report'] = {
+                    'report_file': report_file,
+                    'noise_percentage': noise_percentage,
+                    'cleaning_applied': cleaning_applied,
+                    'recommendations': pattern_analysis['recommendations']
+                }
+        
+        # Update statistics
+        if cleaning_applied:
+            self.processing_stats['documents_with_cleaning'] += 1
+            self.processing_stats['total_noise_reduction'] += noise_percentage
+        
+        return cleaned_chunks
