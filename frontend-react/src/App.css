@@ -1,0 +1,12 @@
+/* App.css - Minimal styles, most styling handled by Tailwind */
+
+.App {
+  text-align: left;
+}
+
+/* Ensure full height for the app */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
