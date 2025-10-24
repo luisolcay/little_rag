@@ -8,7 +8,8 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import logging
 
-from azure.cosmos import CosmosClient, PartitionKey
+from azure.cosmos import CosmosClient
+from azure.cosmos.partition_key import PartitionKey
 from azure.cosmos.exceptions import CosmosResourceNotFoundError, CosmosResourceExistsError
 from azure.core.exceptions import AzureError
 
