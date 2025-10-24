@@ -12,3 +12,9 @@ __pycache__/
 *.db
 chroma_db
 cllh_db
+
+# Documentos PDF para procesamiento (no versionar)
+*.pdf
+
+# Archivos temporales de análisis
+*pattern_analysis*.json
