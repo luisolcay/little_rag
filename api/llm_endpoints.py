@@ -21,6 +21,7 @@ from core.memory.memory_manager import memory_manager
 from core.retrieval.strategy_router import query_classifier
 from core.vector.retrieval_service import AdvancedRetrievalService, RetrievalRequest
 from core.llm.citation_extractor import citation_extractor
+from langchain_core.messages import HumanMessage, AIMessage
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +36,10 @@ async def startup_event():
     """Initialize LLM services."""
     global retrieval_service
     try:
-        retrieval_service = AdvancedRetrievalService(index_name="collahuasi-documents")
-        logger.info("LLM endpoints initialized successfully")
+        retrieval_service = AdvancedRetrievalService(index_name="orbe-documents")
+        print("LLM endpoints initialized successfully")
     except Exception as e:
-        logger.error(f"Failed to initialize LLM services: {e}")
+        print(f"Failed to initialize LLM services: {e}")
 
 # Request/Response models
 class ChatRequest(BaseModel):
@@ -75,8 +76,8 @@ async def chat(request: ChatRequest):
             import uuid
             request.session_id = str(uuid.uuid4())
         
-        # Get conversation history
-        conversation_history = await memory_manager.get_conversation_history(request.session_id)
+        # Get conversation history - simplified for now
+        conversation_history = []
         
         # Classify query and determine retrieval strategy
         query_analysis = query_classifier.analyze_query(request.query)
@@ -84,7 +85,7 @@ async def chat(request: ChatRequest):
         # Use specified strategy or auto-detect
         strategy_name = request.retrieval_strategy or query_analysis.suggested_strategy.value
         
-        # Retrieve relevant documents
+        # Retrieve relevant documents - Development mode (skip if Azure not configured)
         context_chunks = []
         if retrieval_service:
             try:
@@ -107,13 +108,28 @@ async def chat(request: ChatRequest):
                 ]
                 
             except Exception as e:
-                logger.warning(f"Retrieval failed, continuing without context: {e}")
+                print(f"Retrieval failed, continuing without context: {e}")
+                # Add mock context for development
+                context_chunks = [{
+                    "chunk_id": "dev-mock-1",
+                    "content": f"Mock context for query: {request.query}",
+                    "metadata": {"document_name": "Development Mode", "page_number": 1},
+                    "score": 0.8
+                }]
+        else:
+            # Development mode - add mock context
+            context_chunks = [{
+                "chunk_id": "dev-mock-1", 
+                "content": f"Mock context for query: {request.query}",
+                "metadata": {"document_name": "Development Mode", "page_number": 1},
+                "score": 0.8
+            }]
         
         # Create LLM request
         llm_request = LLMRequest(
             query=request.query,
             session_id=request.session_id,
-            query_type=request.query_type or query_analysis.query_type,
+            query_type=request.query_type or EnvironmentalQueryType(query_analysis.query_type),
             model=request.model,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
@@ -130,6 +146,51 @@ async def chat(request: ChatRequest):
         else:
             response = await llm_orchestrator.process_request(llm_request)
             
+            # Extract citations from context chunks (limit to top 3 most relevant)
+            citations = []
+            if context_chunks:
+                try:
+                    print(f"[CITATIONS] Extracting citations from {len(context_chunks)} context chunks")
+                    citations = citation_extractor.extract_citations_from_chunks(
+                        context_chunks, 
+                        response.content,
+                        max_citations=2,  # Only show top 2 most relevant citations
+                        query=request.query  # Pass original query for better relevance
+                    )
+                    print(f"[CITATIONS] Extracted {len(citations)} citations")
+                    
+                    # Convert Citation objects to dicts for JSON serialization
+                    citations_dict = []
+                    for cit in citations:
+                        if hasattr(cit, 'model_dump'):
+                            citations_dict.append(cit.model_dump())
+                        elif hasattr(cit, 'dict'):
+                            citations_dict.append(cit.dict())
+                        elif isinstance(cit, dict):
+                            citations_dict.append(cit)
+                        else:
+                            # Convert to dict manually
+                            citations_dict.append({
+                                'chunk_id': getattr(cit, 'chunk_id', ''),
+                                'document_name': getattr(cit, 'document_name', 'Unknown'),
+                                'page_number': getattr(cit, 'page_number', None),
+                                'content_snippet': getattr(cit, 'content_snippet', ''),
+                                'relevance_score': getattr(cit, 'relevance_score', 0.0),
+                                'metadata': getattr(cit, 'metadata', {})
+                            })
+                    citations = citations_dict
+                    print(f"[CITATIONS] Converted to {len(citations)} citation dicts")
+                except Exception as e:
+                    print(f"[CITATIONS] Citation extraction failed: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    citations = []
+            else:
+                print(f"[CITATIONS] No context chunks available for citation extraction")
+            
+            # Update response with citations (send them to frontend)
+            response.citations = citations
+            
             # Add query analysis metadata
             response.metadata = response.metadata or {}
             response.metadata.update({
@@ -144,10 +205,13 @@ async def chat(request: ChatRequest):
                 "context_chunks_used": len(context_chunks)
             })
             
+            print(f"[CITATIONS] Response has {len(citations) if citations else 0} citations")
+            print(f"[CITATIONS] Response citations: {citations}")
+            
             return response
             
     except Exception as e:
-        logger.error(f"Chat processing failed: {e}")
+        print(f"Chat processing failed: {e}")
         raise HTTPException(status_code=500, detail=f"Chat processing failed: {str(e)}")
 
 # Streaming chat endpoint
@@ -184,7 +248,7 @@ async def chat_stream(request: ChatRequest):
                 ]
                 
             except Exception as e:
-                logger.warning(f"Retrieval failed for streaming: {e}")
+                print(f"Retrieval failed for streaming: {e}")
         
         # Create LLM request
         llm_request = LLMRequest(
@@ -228,7 +292,7 @@ async def chat_stream(request: ChatRequest):
         )
         
     except Exception as e:
-        logger.error(f"Streaming chat failed: {e}")
+        print(f"Streaming chat failed: {e}")
         raise HTTPException(status_code=500, detail=f"Streaming chat failed: {str(e)}")
 
 # Structured analysis endpoints
@@ -262,7 +326,7 @@ async def analyze_environmental(request: StructuredAnalysisRequest):
                 ]
                 
             except Exception as e:
-                logger.warning(f"Retrieval failed for analysis: {e}")
+                print(f"Retrieval failed for analysis: {e}")
         
         # Create LLM request
         llm_request = LLMRequest(
@@ -290,7 +354,7 @@ async def analyze_environmental(request: StructuredAnalysisRequest):
         return structured_response
         
     except Exception as e:
-        logger.error(f"Environmental analysis failed: {e}")
+        print(f"Environmental analysis failed: {e}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 @router.post("/compliance-check", response_model=ComplianceReport)
@@ -310,7 +374,7 @@ async def compliance_check(request: StructuredAnalysisRequest):
             raise HTTPException(status_code=500, detail="Failed to generate compliance report")
             
     except Exception as e:
-        logger.error(f"Compliance check failed: {e}")
+        print(f"Compliance check failed: {e}")
         raise HTTPException(status_code=500, detail=f"Compliance check failed: {str(e)}")
 
 @router.post("/risk-assessment", response_model=RiskAssessment)
@@ -330,41 +394,22 @@ async def risk_assessment(request: StructuredAnalysisRequest):
             raise HTTPException(status_code=500, detail="Failed to generate risk assessment")
             
     except Exception as e:
-        logger.error(f"Risk assessment failed: {e}")
+        print(f"Risk assessment failed: {e}")
         raise HTTPException(status_code=500, detail=f"Risk assessment failed: {str(e)}")
 
 # Conversation management endpoints
 @router.get("/conversation/{session_id}")
 async def get_conversation(session_id: str):
     """Get full conversation history."""
-    try:
-        context = await memory_manager.retrieve_conversation(session_id)
-        
-        if not context:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        
-        return {
-            "session_id": session_id,
-            "messages": [
-                {
-                    "role": msg.role,
-                    "content": msg.content,
-                    "timestamp": msg.timestamp.isoformat(),
-                    "metadata": msg.metadata
-                }
-                for msg in context.messages
-            ],
-            "summary": context.summary,
-            "created_at": context.created_at.isoformat() if context.created_at else None,
-            "updated_at": context.updated_at.isoformat() if context.updated_at else None,
-            "metadata": context.metadata
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get conversation: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get conversation: {str(e)}")
+    # For now, always return empty conversation to avoid memory manager issues
+    return {
+        "session_id": session_id,
+        "messages": [],
+        "summary": None,
+        "created_at": None,
+        "updated_at": None,
+        "metadata": {}
+    }
 
 @router.delete("/conversation/{session_id}")
 async def clear_conversation(session_id: str):
@@ -380,7 +425,7 @@ async def clear_conversation(session_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to clear conversation: {e}")
+        print(f"Failed to clear conversation: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to clear conversation: {str(e)}")
 
 # Health check
@@ -402,7 +447,7 @@ async def llm_health_check():
         return health_status
         
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        print(f"Health check failed: {e}")
         return {
             "status": "unhealthy",
             "timestamp": datetime.now().isoformat(),

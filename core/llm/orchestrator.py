@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from enum import Enum
 
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
@@ -64,7 +64,7 @@ class CircuitBreaker:
         
         if self.failure_count >= self.failure_threshold:
             self.state = CircuitState.OPEN
-            logger.warning(f"Circuit breaker opened after {self.failure_count} failures")
+            print(f"Circuit breaker opened after {self.failure_count} failures")
 
 class RetryConfig:
     """Configuration for retry logic."""
@@ -114,16 +114,21 @@ class LLMOrchestrator:
             self._initialized = True
             print("[LLM_ORCHESTRATOR] Initialized Enhanced LLM Orchestrator with LangChain, Circuit Breaker, and Retry Logic.")
 
-    def _initialize_llms(self) -> Dict[ModelName, ChatOpenAI]:
-        """Initialize LangChain LLMs."""
+    def _initialize_llms(self) -> Dict[ModelName, AzureChatOpenAI]:
+        """Initialize Azure Chat OpenAI LLMs."""
         llms = {}
         default_temperature = float(os.getenv("LLM_DEFAULT_TEMPERATURE", 0.1))
+        
+        print(f"[LLM_ORCHESTRATOR] Initializing Azure Chat OpenAI LLMs")
         
         # Initialize GPT-4o
         gpt4o_deployment = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-4o")
         if gpt4o_deployment:
-            llms[ModelName.GPT4_O] = ChatOpenAI(
-                model=gpt4o_deployment,
+            llms[ModelName.GPT4_O] = AzureChatOpenAI(
+                azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+                api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+                api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21"),
+                deployment_name=gpt4o_deployment,
                 temperature=default_temperature,
                 streaming=os.getenv("ENABLE_STREAMING", "true").lower() == "true"
             )
@@ -132,8 +137,11 @@ class LLMOrchestrator:
         # Initialize GPT-4o-mini
         gpt4omini_deployment = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_MINI", "gpt-4o-mini")
         if gpt4omini_deployment:
-            llms[ModelName.GPT4_O_MINI] = ChatOpenAI(
-                model=gpt4omini_deployment,
+            llms[ModelName.GPT4_O_MINI] = AzureChatOpenAI(
+                azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+                api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+                api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21"),
+                deployment_name=gpt4omini_deployment,
                 temperature=default_temperature,
                 streaming=os.getenv("ENABLE_STREAMING", "true").lower() == "true"
             )
@@ -197,15 +205,15 @@ Guidelines:
                 if attempt < self.retry_config.max_retries:
                     delay = self.retry_config.get_delay(attempt)
                     self.metrics["retry_attempts"] += 1
-                    logger.warning(f"Attempt {attempt + 1} failed for model {model}, retrying in {delay}s: {e}")
+                    print(f"Attempt {attempt + 1} failed for model {model}, retrying in {delay}s: {e}")
                     await asyncio.sleep(delay)
                 else:
-                    logger.error(f"All retry attempts failed for model {model}: {e}")
+                    print(f"All retry attempts failed for model {model}: {e}")
         
         self.metrics["failed_requests"] += 1
         raise last_exception
 
-    def _get_llm(self, model_name: ModelName) -> ChatOpenAI:
+    def _get_llm(self, model_name: ModelName) -> AzureChatOpenAI:
         """Get LLM instance."""
         llm = self.llms.get(model_name)
         if not llm:
@@ -306,7 +314,7 @@ Guidelines:
             logging.error(f"Error in _process_request_internal: {e}")
             raise
     
-    async def _process_general_qa(self, llm: ChatOpenAI, query: str, context: str, chat_history: List[BaseMessage]) -> str:
+    async def _process_general_qa(self, llm: AzureChatOpenAI, query: str, context: str, chat_history: List[BaseMessage]) -> str:
         """Process general QA using LangChain."""
         qa_chain = self.environmental_prompt | llm | StrOutputParser()
         

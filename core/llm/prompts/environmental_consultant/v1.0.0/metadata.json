@@ -1,0 +1,10 @@
+{
+  "version": "v1.0.0",
+  "prompt_type": "environmental_consultant",
+  "author": "system",
+  "created_at": "2024-01-20T00:00:00Z",
+  "changelog": "Initial version - Environmental consulting system prompt",
+  "variables": ["query_type", "context", "user_role"],
+  "description": "Main system prompt for environmental consulting AI assistant"
+}
+
