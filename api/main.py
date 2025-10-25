@@ -11,6 +11,7 @@ import logging
 
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 import shutil
 import uuid
@@ -58,6 +59,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files for React frontend (must be before routers)
+# Check if frontend build directory exists
+frontend_build_path = Path(__file__).parent.parent / "frontend-react" / "build"
+if frontend_build_path.exists():
+    app.mount("/static", StaticFiles(directory=str(frontend_build_path / "static")), name="static")
+    # Serve React app for any route that doesn't match API endpoints
+    app.mount("/", StaticFiles(directory=str(frontend_build_path), html=True), name="frontend")
 
 # Include all routers
 app.include_router(llm_router)
