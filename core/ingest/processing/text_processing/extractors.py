@@ -242,6 +242,87 @@ class TesseractExtractor(BaseExtractor):
         
         return '\n'.join(cleaned_lines)
 
+class ExcelExtractor(BaseExtractor):
+    """
+    Excel file extractor with row-level chunking strategy.
+    
+    Features:
+    - Row-by-row extraction (one row = one chunk)
+    - Column headers included in each row for context
+    - Sheet-by-sheet processing
+    - Optimal for precise search queries
+    """
+    
+    def __init__(self):
+        try:
+            import pandas as pd
+            self.pd = pd
+            self.available = True
+        except ImportError:
+            self.available = False
+            print("⚠️ pandas not available. Install with: pip install pandas")
+    
+    def extract(self, file_path: str) -> List[Tuple[str, int]]:
+        """
+        Extract Excel with row-level chunking.
+        
+        Each row becomes a separate text chunk that will be embedded.
+        
+        Args:
+            file_path: Path to Excel file (.xlsx or .xls)
+            
+        Returns:
+            List of tuples (text, row_id)
+            Each tuple represents one row as a structured text
+        """
+        if not self.available:
+            raise ImportError("pandas not available")
+        
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+        
+        try:
+            # Load Excel file
+            excel_file = self.pd.ExcelFile(file_path, engine='openpyxl')
+            sheet_names = excel_file.sheet_names
+            
+            all_rows = []
+            
+            for sheet_num, sheet_name in enumerate(sheet_names, 1):
+                # Read sheet as DataFrame
+                df = self.pd.read_excel(excel_file, sheet_name=sheet_name)
+                
+                if df.empty:
+                    continue
+                
+                # Get column headers
+                headers = df.columns.tolist()
+                header_row = " | ".join(str(h) for h in headers)
+                
+                # Process each row
+                for idx, row in df.iterrows():
+                    # Convert row values to strings
+                    row_values = [str(val) if self.pd.notna(val) else "" for val in row.values]
+                    value_row = " | ".join(row_values)
+                    
+                    # Create row chunk with context
+                    row_text = f"Sheet: {sheet_name}\n{header_row}\n{value_row}"
+                    
+                    # Use a unique identifier for each row across all sheets
+                    row_id = (sheet_num - 1) * 10000 + idx
+                    all_rows.append((row_text, row_id))
+            
+            excel_file.close()
+            
+            if not all_rows:
+                return [("", 1)]
+            
+            return all_rows
+            
+        except Exception as e:
+            print(f"❌ Excel extraction failed: {e}")
+            return [("", 1)]
+
 class HybridExtractor(BaseExtractor):
     """
     Hybrid extractor that combines multiple extraction methods.
@@ -271,38 +352,65 @@ class HybridExtractor(BaseExtractor):
         except Exception:
             pass
         
+        try:
+            excel_extractor = ExcelExtractor()
+            if excel_extractor.available:
+                self.extractors.append(('excel', excel_extractor))
+        except Exception:
+            pass
+        
         if not self.extractors:
             raise ImportError("No text extractors available")
     
     def extract(self, file_path: str) -> List[Tuple[str, int]]:
         """
-        Extract text using the best available method.
+        Extract text using the best available method based on file type.
         
         Args:
             file_path: Path to document file
             
         Returns:
-            List of tuples (text, page_number)
+            List of tuples (text, page_number or row_id)
         """
-        # Try extractors in order of preference
-        for method_name, extractor in self.extractors:
-            try:
-                print(f"[HYBRID_EXTRACTOR] Trying {method_name} extraction...")
-                result = extractor.extract(file_path)
-                
-                # Validate result quality
-                if self._validate_extraction_quality(result):
-                    print(f"[HYBRID_EXTRACTOR] OK {method_name} extraction successful")
-                    return result
-                else:
-                    print(f"[HYBRID_EXTRACTOR] WARNING {method_name} extraction quality low, trying next method...")
-                    
-            except Exception as e:
-                print(f"[HYBRID_EXTRACTOR] ERROR {method_name} extraction failed: {e}")
-                continue
+        # Determine file type
+        file_ext = os.path.splitext(file_path)[1].lower()
         
-        # If all methods failed, return empty result
-        print("[HYBRID_EXTRACTOR] ERROR All extraction methods failed")
+        # Route to appropriate extractor
+        if file_ext in ['.xlsx', '.xls']:
+            # Use Excel extractor
+            for method_name, extractor in self.extractors:
+                if method_name == 'excel':
+                    try:
+                        print(f"[HYBRID_EXTRACTOR] Using Excel extraction...")
+                        result = extractor.extract(file_path)
+                        if result and len(result) > 0:
+                            print(f"[HYBRID_EXTRACTOR] ✅ Excel extraction successful: {len(result)} rows")
+                            return result
+                    except Exception as e:
+                        print(f"[HYBRID_EXTRACTOR] ❌ Excel extraction failed: {e}")
+            # If no excel extractor found
+            print("[HYBRID_EXTRACTOR] ❌ No Excel extractor available")
+            return [("", 1)]
+        
+        elif file_ext == '.pdf':
+            # Try PDF extractors in order of preference
+            for method_name, extractor in self.extractors:
+                if method_name in ['pymupdf', 'tesseract']:
+                    try:
+                        print(f"[HYBRID_EXTRACTOR] Trying {method_name} extraction...")
+                        result = extractor.extract(file_path)
+                        
+                        if self._validate_extraction_quality(result):
+                            print(f"[HYBRID_EXTRACTOR] ✅ {method_name} extraction successful")
+                            return result
+                        else:
+                            print(f"[HYBRID_EXTRACTOR] ⚠️ {method_name} extraction quality low, trying next...")
+                    except Exception as e:
+                        print(f"[HYBRID_EXTRACTOR] ❌ {method_name} extraction failed: {e}")
+                        continue
+        
+        # If all methods failed
+        print("[HYBRID_EXTRACTOR] ❌ All extraction methods failed")
         return [("", 1)]
     
     def _validate_extraction_quality(self, result: List[Tuple[str, int]]) -> bool:

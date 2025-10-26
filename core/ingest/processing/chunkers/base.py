@@ -124,6 +124,10 @@ class HybridChunker(BaseChunker):
             
             # Convert to Chunk objects with metadata
             chunk_objects = []
+            
+            # Check if this is an Excel file
+            is_excel = doc_file.metadata.get('file_type') == 'excel'
+            
             for i, chunk_text in enumerate(chunks):
                 metadata = {
                     **doc_file.metadata,
@@ -134,6 +138,16 @@ class HybridChunker(BaseChunker):
                     'ocr_pages_needed': ocr_pages_needed,
                     'total_pages': len(pages)
                 }
+                
+                # Add Excel-specific metadata
+                if is_excel:
+                    metadata['chunk_type'] = 'row'
+                    metadata['row_number'] = i
+                    # Extract sheet name from content if available
+                    if chunk_text.startswith('Sheet:'):
+                        lines = chunk_text.split('\n')
+                        if lines:
+                            metadata['sheet_name'] = lines[0].replace('Sheet: ', '')
                 
                 chunk_obj = Chunk(content=chunk_text, metadata=metadata)
                 chunk_objects.append(chunk_obj)

@@ -14,7 +14,8 @@ from .text_processing.extractors import (
     BaseExtractor,
     PyMuPDFExtractor,
     TesseractExtractor,
-    HybridExtractor
+    HybridExtractor,
+    ExcelExtractor
 )
 from .text_processing.splitters import (
     BaseSplitter,
@@ -54,6 +55,7 @@ __all__ = [
     'PyMuPDFExtractor',
     'TesseractExtractor',
     'HybridExtractor',
+    'ExcelExtractor',
     
     # Splitters
     'BaseSplitter',

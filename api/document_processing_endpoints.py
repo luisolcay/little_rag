@@ -129,10 +129,13 @@ async def upload_document(
     """
     try:
         # Validate file type
-        if not file.filename.lower().endswith('.pdf'):
+        allowed_extensions = {'.pdf', '.xlsx', '.xls'}
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        
+        if file_ext not in allowed_extensions:
             raise HTTPException(
                 status_code=400, 
-                detail="Only PDF files are supported"
+                detail=f"Only PDF and Excel files (.xlsx, .xls) are supported. Received: {file_ext}"
             )
         
         # Generate unique document ID
@@ -214,7 +217,11 @@ async def process_document(
         document_file_path = document_files[0]
         filename = document_file_path.name.split('_', 1)[1] if '_' in document_file_path.name else document_file_path.name
         
-        logger.info(f"🔄 Processing document: {filename}")
+        # Determine file type
+        file_ext = os.path.splitext(filename)[1].lower()
+        is_excel = file_ext in ['.xlsx', '.xls']
+        
+        logger.info(f"🔄 Processing document: {filename} (type: {file_ext})")
         
         # Create DocumentFile
         doc_file = DocumentFile(
@@ -222,10 +229,11 @@ async def process_document(
             blob_name=filename,
             metadata={
                 "blob_name": filename,
-                "original_ext": ".pdf",
+                "original_ext": file_ext,
                 "size_bytes": document_file_path.stat().st_size,
                 "needs_ocr": False,
-                "document_id": request.document_id
+                "document_id": request.document_id,
+                "file_type": "excel" if is_excel else "pdf"
             },
             needs_ocr=False
         )
