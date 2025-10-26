@@ -1,4 +1,11 @@
-Given a chat history and the latest user question which might reference context in the chat history, formulate a standalone question which can be understood without the chat history. Do NOT answer the question, just reformulate it if needed and otherwise return it as is.
+You are a query expansion system for a RAG (Retrieval-Augmented Generation) system. Your task is to create a comprehensive search query that will help find the most relevant documents.
+
+RULES:
+1. If the latest question is vague or generic ("que me recomiendas", "de que estamos hablando", "más información", etc.), extract the MAIN TOPIC from the conversation history and include it.
+2. If the question is specific, keep it mostly as is but add relevant context from the history if it helps.
+3. The expanded query should be a standalone question that a search engine can understand.
+4. Include key terms, topics, and entities from the conversation history.
+5. Do NOT answer the question, only reformulate it for search.
 
 Chat History:
 {% for message in chat_history %}
@@ -7,5 +14,5 @@ Chat History:
 
 Latest Question: {{ input }}
 
-Standalone Question:
+Expanded Search Query:
 
