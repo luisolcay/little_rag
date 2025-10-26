@@ -1,0 +1,97 @@
+# Core FastAPI and ASGI server
+fastapi==0.118.3
+uvicorn==0.37.0
+python-multipart==0.0.20
+starlette==0.48.0
+
+# LangChain ecosystem
+langchain==0.3.27
+langchain-openai==0.2.14
+langchain-core==0.3.76
+langchain-community==0.3.30
+langchain-chroma==0.2.6
+langchain-text-splitters==0.3.11
+
+# Azure Services
+azure-search-documents==11.6.0
+azure-cosmos==4.14.0
+azure-core==1.35.1
+azure-identity==1.25.1
+azure-common==1.1.28
+azure-ai-documentintelligence==1.0.0  # Optional: For Azure Document Intelligence OCR
+
+# OpenAI
+openai==1.109.1
+
+# Redis
+redis[hiredis]>=5.0.0
+
+# HTTP and Async
+httpx==0.28.1
+aiohttp==3.12.15
+requests==2.32.5
+
+# Data processing
+pydantic==2.11.9
+pydantic-settings==2.11.0
+pydantic_core==2.33.2
+python-dotenv==1.1.1
+tiktoken==0.11.0
+
+# Document processing
+docling==2.57.0
+docling-core==2.49.0
+docling-ibm-models==3.10.0
+docling-parse==4.6.0
+
+# PDF processing
+pypdf==6.1.1
+PyMuPDF==1.26.5
+pdfplumber==0.11.4
+
+# Office documents
+python-docx==1.2.0
+openpyxl==3.1.5
+
+# OCR
+pytesseract==0.3.13
+Pillow==11.2.1
+
+# Vector databases
+chromadb==1.1.1
+faiss-cpu==1.12.0
+
+# JSON and encoding
+orjson==3.11.3
+
+# Utilities
+numpy==2.2.6
+pandas==2.3.2
+scikit-learn==1.7.2
+
+# Text processing utilities
+nltk>=3.8.1
+sentence-transformers>=3.0.0  # For embeddings if needed
+
+# Monitoring and logging
+prometheus-client==0.19.0
+
+# Additional dependencies
+certifi==2025.8.3
+charset-normalizer==3.4.3
+idna==3.10
+urllib3==2.3.0
+typing_extensions==4.15.0
+packaging==24.2
+
+# ==============================================================================
+# SYSTEM NOTES
+# ==============================================================================
+#
+# OCR SYSTEM SETUP:
+# ----------------
+# 1. Tesseract OCR binary (REQUIRED for PDF scanning):
+#    - Windows: winget install UB-Mannheim.TesseractOCR
+#    - Or download from: https://github.com/UB-Mannheim/tesseract/wiki
+#    - Python wrapper (pytesseract) is installed via this requirements.txt
+# ==============================================================================
