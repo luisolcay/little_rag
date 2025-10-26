@@ -161,10 +161,29 @@ class TesseractOcrProvider(BaseOcrProvider):
             import pytesseract
             from PIL import Image
             import fitz  # PyMuPDF for PDF handling
+            import io
+            import os
+            
+            # Auto-configure Tesseract path on Windows
+            if os.name == 'nt':  # Windows
+                if not pytesseract.pytesseract.tesseract_cmd or not os.path.exists(pytesseract.pytesseract.tesseract_cmd):
+                    # Try to find Tesseract in common locations
+                    possible_paths = [
+                        r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+                        r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+                        r'C:\tesseract\tesseract.exe',
+                    ]
+                    
+                    for path in possible_paths:
+                        if os.path.exists(path):
+                            pytesseract.pytesseract.tesseract_cmd = path
+                            print(f"✅ Tesseract configured: {path}")
+                            break
             
             self.pytesseract = pytesseract
             self.Image = Image
             self.fitz = fitz
+            self.io = io
             self.language = language
             self.config = config
             self.available = True
@@ -202,7 +221,7 @@ class TesseractOcrProvider(BaseOcrProvider):
                     img_data = pix.tobytes("png")
                     
                     # OCR on image
-                    image = self.Image.open(io.BytesIO(img_data))
+                    image = self.Image.open(self.io.BytesIO(img_data))
                     text = self.pytesseract.image_to_string(
                         image, 
                         lang=self.language, 

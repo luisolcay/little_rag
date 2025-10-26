@@ -7,6 +7,7 @@ document types with intelligent fallback mechanisms.
 """
 
 import os
+import io
 from typing import List, Tuple, Optional
 from abc import ABC, abstractmethod
 
@@ -291,17 +292,17 @@ class HybridExtractor(BaseExtractor):
                 
                 # Validate result quality
                 if self._validate_extraction_quality(result):
-                    print(f"[HYBRID_EXTRACTOR] ✅ {method_name} extraction successful")
+                    print(f"[HYBRID_EXTRACTOR] OK {method_name} extraction successful")
                     return result
                 else:
-                    print(f"[HYBRID_EXTRACTOR] ⚠️ {method_name} extraction quality low, trying next method...")
+                    print(f"[HYBRID_EXTRACTOR] WARNING {method_name} extraction quality low, trying next method...")
                     
             except Exception as e:
-                print(f"[HYBRID_EXTRACTOR] ❌ {method_name} extraction failed: {e}")
+                print(f"[HYBRID_EXTRACTOR] ERROR {method_name} extraction failed: {e}")
                 continue
         
         # If all methods failed, return empty result
-        print("[HYBRID_EXTRACTOR] ❌ All extraction methods failed")
+        print("[HYBRID_EXTRACTOR] ERROR All extraction methods failed")
         return [("", 1)]
     
     def _validate_extraction_quality(self, result: List[Tuple[str, int]]) -> bool:
