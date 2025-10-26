@@ -103,6 +103,11 @@ async def startup_event():
             auto_clean_headers=True,
             noise_threshold=10.0,
             
+            # Hybrid semantic chunking (NEW)
+            use_hybrid_semantic=True,
+            semantic_threshold=0.6,
+            enable_semantic_caching=True,
+            
             verbose=False  # Disable verbose logging in API
         )
         

@@ -23,6 +23,7 @@ from .text_processing.splitters import (
     SemanticOverlapSplitter,
     AdaptiveSplitter
 )
+from .text_processing.hybrid_semantic_splitter import ScalableHybridSplitter
 from .chunkers.base import BaseChunker, HybridChunker
 from .chunkers.enhanced import EnhancedHybridChunker
 from .analysis.quality_validator import ChunkQualityValidator
@@ -62,6 +63,7 @@ __all__ = [
     'TokenBasedSplitter',
     'SemanticOverlapSplitter',
     'AdaptiveSplitter',
+    'ScalableHybridSplitter',
     
     # Chunkers
     'BaseChunker',

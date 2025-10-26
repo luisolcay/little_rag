@@ -50,6 +50,10 @@ class EnhancedHybridChunker(HybridChunker):
                  pattern_similarity_threshold: float = 0.8,
                  auto_clean_headers: bool = True,
                  noise_threshold: float = 15.0,  # Auto-clean if noise > 15%
+                 # Hybrid semantic chunking settings (NEW)
+                 use_hybrid_semantic: bool = True,
+                 semantic_threshold: float = 0.6,
+                 enable_semantic_caching: bool = True,
                  # Logging settings
                  verbose: bool = True):
         
@@ -65,12 +69,36 @@ class EnhancedHybridChunker(HybridChunker):
             min_text_length=min_text_length
         )
         
-        # Replace splitter with semantic version
-        self.splitter = SemanticOverlapSplitter(
-            max_tokens=max_tokens,
-            overlap_sentences=overlap_sentences,
-            preserve_paragraphs=preserve_paragraphs
-        )
+        # Store verbose early for use in splitter initialization
+        self.verbose = verbose
+        
+        # Replace splitter with hybrid semantic version or fallback to structural
+        if use_hybrid_semantic:
+            try:
+                from ..text_processing.hybrid_semantic_splitter import ScalableHybridSplitter
+                self.splitter = ScalableHybridSplitter(
+                    chunk_size=max_tokens,
+                    chunk_overlap=overlap_tokens,
+                    semantic_threshold=semantic_threshold,
+                    use_caching=enable_semantic_caching
+                )
+                if self.verbose:
+                    print("[ENHANCED] Using ScalableHybridSplitter (hybrid semantic)")
+            except Exception as e:
+                if self.verbose:
+                    print(f"[ENHANCED] Failed to load ScalableHybridSplitter: {e}")
+                    print("[ENHANCED] Falling back to SemanticOverlapSplitter")
+                self.splitter = SemanticOverlapSplitter(
+                    max_tokens=max_tokens,
+                    overlap_sentences=overlap_sentences,
+                    preserve_paragraphs=preserve_paragraphs
+                )
+        else:
+            self.splitter = SemanticOverlapSplitter(
+                max_tokens=max_tokens,
+                overlap_sentences=overlap_sentences,
+                preserve_paragraphs=preserve_paragraphs
+            )
         
         # Initialize quality validator
         self.quality_validator = ChunkQualityValidator(
@@ -95,7 +123,11 @@ class EnhancedHybridChunker(HybridChunker):
         self.enable_pattern_detection = enable_pattern_detection
         self.auto_clean_headers = auto_clean_headers
         self.noise_threshold = noise_threshold
-        self.verbose = verbose
+        
+        # Hybrid semantic settings
+        self.use_hybrid_semantic = use_hybrid_semantic
+        self.semantic_threshold = semantic_threshold
+        self.enable_semantic_caching = enable_semantic_caching
         
         # Statistics tracking
         self.processing_stats = {
@@ -106,7 +138,9 @@ class EnhancedHybridChunker(HybridChunker):
             'reference_coverage': 0.0,
             'pattern_detection_enabled': enable_pattern_detection,
             'total_noise_reduction': 0.0,
-            'documents_with_cleaning': 0
+            'documents_with_cleaning': 0,
+            'chunking_strategy': 'hybrid_semantic' if use_hybrid_semantic else 'structural',
+            'use_hybrid_semantic': use_hybrid_semantic
         }
     
     def chunk_document(self, doc_file: DocumentFile) -> List[Chunk]:
