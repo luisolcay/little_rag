@@ -77,10 +77,13 @@ class ApiService {
    * Get conversation history for a session
    */
   async getConversation(sessionId: string): Promise<ConversationHistory> {
+    console.log('[API] getConversation called with sessionId:', sessionId);
     try {
       const response: AxiosResponse<ConversationHistory> = await api.get(`/llm/conversation/${sessionId}`);
+      console.log('[API] getConversation response:', response.data);
       return response.data;
     } catch (error: any) {
+      console.error('[API] getConversation error:', error);
       throw this.handleError(error);
     }
   }

@@ -31,26 +31,36 @@ export function ChatInterface({ className = '' }: ChatInterfaceProps) {
   }, [activeSession?.id]);
 
   const loadConversationHistory = async (sessionId: string) => {
+    console.log('[ChatInterface] loadConversationHistory called for:', sessionId);
     setIsLoadingHistory(true);
     setError(null);
     
     try {
+      console.log('[ChatInterface] Calling apiService.getConversation...');
       const history = await apiService.getConversation(sessionId);
+      console.log('[ChatInterface] History received:', history);
+      console.log('[ChatInterface] Messages array:', history.messages);
+      console.log('[ChatInterface] Messages length:', history.messages?.length);
       
       // Convert conversation history to ChatMessage format
-      const chatMessages: ChatMessage[] = history.messages.map(msg => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-        timestamp: msg.timestamp,
-        citations: msg.metadata?.citations || [],
-        metadata: msg.metadata
-      }));
+      const chatMessages: ChatMessage[] = (history.messages || []).map((msg: any) => {
+        console.log('[ChatInterface] Mapping message:', msg);
+        return {
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+          timestamp: msg.timestamp,
+          citations: msg.metadata?.citations || [],
+          metadata: msg.metadata
+        };
+      });
       
+      console.log('[ChatInterface] Converted messages:', chatMessages);
       setMessages(chatMessages);
     } catch (err: any) {
-      console.error('Failed to load conversation history:', err);
+      console.error('[ChatInterface] Failed to load conversation history:', err);
+      console.error('[ChatInterface] Error details:', err.message, err.stack);
       // Don't show error for empty conversations, just start fresh
-      if (err.message.includes('404') || err.message.includes('not found')) {
+      if (err.message && (err.message.includes('404') || err.message.includes('not found'))) {
         setMessages([]);
       } else {
         setError('Failed to load conversation history');
@@ -61,7 +71,11 @@ export function ChatInterface({ className = '' }: ChatInterfaceProps) {
   };
 
   const handleSendMessage = useCallback(async (messageText: string) => {
+    console.log('[ChatInterface] handleSendMessage called:', messageText);
+    console.log('[ChatInterface] activeSession:', activeSession);
+    
     if (!activeSession) {
+      console.error('[ChatInterface] NO ACTIVE SESSION!');
       setError('No active session. Please create or select a session.');
       return;
     }
@@ -79,6 +93,7 @@ export function ChatInterface({ className = '' }: ChatInterfaceProps) {
     setMessages(prev => [...prev, userMessage]);
 
     try {
+      console.log('[ChatInterface] Calling apiService.sendMessage...');
       const response = await apiService.sendMessage({
         query: messageText,
         session_id: activeSession.id,
@@ -87,6 +102,7 @@ export function ChatInterface({ className = '' }: ChatInterfaceProps) {
         temperature: 0.1,
         max_tokens: 4096,
       });
+      console.log('[ChatInterface] Response received:', response);
 
       // Add assistant response
       const assistantMessage: ChatMessage = {
