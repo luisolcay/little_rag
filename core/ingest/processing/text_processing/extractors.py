@@ -88,7 +88,7 @@ class PyMuPDFExtractor(BaseExtractor):
             return pages_text
             
         except Exception as e:
-            print(f"❌ PyMuPDF extraction failed: {e}")
+            print(f"[ERROR] PyMuPDF extraction failed: {e}")
             # Try fallback extraction
             return self._fallback_extraction(file_path)
     
@@ -129,7 +129,7 @@ class PyMuPDFExtractor(BaseExtractor):
         except ImportError:
             print("⚠️ pdfplumber not available for fallback")
         except Exception as e:
-            print(f"❌ Fallback extraction failed: {e}")
+            print(f"[ERROR] Fallback extraction failed: {e}")
         
         # Last resort: return empty with single page
         return [("", 1)]
@@ -179,7 +179,7 @@ class TesseractExtractor(BaseExtractor):
                 return self._extract_from_image(file_path)
                 
         except Exception as e:
-            print(f"❌ Tesseract extraction failed: {e}")
+            print(f"[ERROR] Tesseract extraction failed: {e}")
             return [("", 1)]
     
     def _extract_from_pdf(self, file_path: str) -> List[Tuple[str, int]]:
@@ -210,7 +210,7 @@ class TesseractExtractor(BaseExtractor):
             return pages_text
             
         except Exception as e:
-            print(f"❌ PDF OCR extraction failed: {e}")
+            print(f"[ERROR] PDF OCR extraction failed: {e}")
             return [("", 1)]
     
     def _extract_from_image(self, file_path: str) -> List[Tuple[str, int]]:
@@ -223,7 +223,7 @@ class TesseractExtractor(BaseExtractor):
             return [(cleaned_text, 1)] if cleaned_text.strip() else [("", 1)]
             
         except Exception as e:
-            print(f"❌ Image OCR extraction failed: {e}")
+            print(f"[ERROR] Image OCR extraction failed: {e}")
             return [("", 1)]
     
     def _clean_text(self, text: str) -> str:
@@ -320,7 +320,7 @@ class ExcelExtractor(BaseExtractor):
             return all_rows
             
         except Exception as e:
-            print(f"❌ Excel extraction failed: {e}")
+            print(f"[ERROR] Excel extraction failed: {e}")
             return [("", 1)]
 
 class HybridExtractor(BaseExtractor):
@@ -384,12 +384,12 @@ class HybridExtractor(BaseExtractor):
                         print(f"[HYBRID_EXTRACTOR] Using Excel extraction...")
                         result = extractor.extract(file_path)
                         if result and len(result) > 0:
-                            print(f"[HYBRID_EXTRACTOR] ✅ Excel extraction successful: {len(result)} rows")
+                            print(f"[HYBRID_EXTRACTOR] [OK] Excel extraction successful: {len(result)} rows")
                             return result
                     except Exception as e:
-                        print(f"[HYBRID_EXTRACTOR] ❌ Excel extraction failed: {e}")
+                        print(f"[HYBRID_EXTRACTOR] [ERROR] Excel extraction failed: {e}")
             # If no excel extractor found
-            print("[HYBRID_EXTRACTOR] ❌ No Excel extractor available")
+            print("[HYBRID_EXTRACTOR] [ERROR] No Excel extractor available")
             return [("", 1)]
         
         elif file_ext == '.pdf':

@@ -91,7 +91,7 @@ class AzureDocumentIntelligenceOcrProvider(BaseOcrProvider):
             return pages_text if pages_text else [("", 1)]
             
         except Exception as e:
-            print(f"❌ Azure Document Intelligence OCR failed: {e}")
+            print(f"[ERROR] Azure Document Intelligence OCR failed: {e}")
             return [("", 1)]
 
 class DoclingOcrProvider(BaseOcrProvider):
@@ -142,7 +142,7 @@ class DoclingOcrProvider(BaseOcrProvider):
             return pages_text if pages_text else [("", 1)]
             
         except Exception as e:
-            print(f"❌ Docling OCR failed: {e}")
+            print(f"[ERROR] Docling OCR failed: {e}")
             return [("", 1)]
 
 class TesseractOcrProvider(BaseOcrProvider):
@@ -177,7 +177,7 @@ class TesseractOcrProvider(BaseOcrProvider):
                     for path in possible_paths:
                         if os.path.exists(path):
                             pytesseract.pytesseract.tesseract_cmd = path
-                            print(f"✅ Tesseract configured: {path}")
+                            print(f"[OK] Tesseract configured: {path}")
                             break
             
             self.pytesseract = pytesseract
@@ -249,7 +249,7 @@ class TesseractOcrProvider(BaseOcrProvider):
             return pages_text if pages_text else [("", 1)]
             
         except Exception as e:
-            print(f"❌ Tesseract OCR failed: {e}")
+            print(f"[ERROR] Tesseract OCR failed: {e}")
             return [("", 1)]
     
     def _clean_text(self, text: str) -> str:
@@ -322,17 +322,17 @@ class HybridOcrProvider(BaseOcrProvider):
                 
                 # Validate result quality
                 if self._validate_ocr_quality(result):
-                    print(f"[HYBRID_OCR] ✅ {provider_name} OCR successful")
+                    print(f"[HYBRID_OCR] [OK] {provider_name} OCR successful")
                     return result
                 else:
                     print(f"[HYBRID_OCR] ⚠️ {provider_name} OCR quality low, trying next provider...")
                     
             except Exception as e:
-                print(f"[HYBRID_OCR] ❌ {provider_name} OCR failed: {e}")
+                print(f"[HYBRID_OCR] [ERROR] {provider_name} OCR failed: {e}")
                 continue
         
         # If all providers failed, return empty result
-        print("[HYBRID_OCR] ❌ All OCR providers failed")
+        print("[HYBRID_OCR] [ERROR] All OCR providers failed")
         return [("", 1)]
     
     def _validate_ocr_quality(self, result: List[Tuple[str, int]]) -> bool:
