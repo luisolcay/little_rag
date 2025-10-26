@@ -240,12 +240,25 @@ Guidelines:
             contextualized_query = request.query
             chat_history = request.conversation_history or []
             if chat_history:
-                contextualize_chain = self.contextualize_prompt | llm | StrOutputParser()
-                contextualized_query = await contextualize_chain.ainvoke({
-                    "chat_history": chat_history,
-                    "input": request.query
-                })
-                logging.info(f"Contextualized query: {contextualized_query}")
+                # Convert to dict format if needed
+                from langchain_core.messages import HumanMessage, AIMessage
+                history_for_prompt = []
+                for msg in chat_history:
+                    if isinstance(msg, dict):
+                        history_for_prompt.append(msg)
+                    elif hasattr(msg, 'content'):
+                        role = "user" if isinstance(msg, HumanMessage) else "assistant"
+                        history_for_prompt.append({"role": role, "content": msg.content})
+                    else:
+                        logging.warning(f"Skipping unrecognized message type: {type(msg)}")
+                
+                if history_for_prompt:
+                    contextualize_chain = self.contextualize_prompt | llm | StrOutputParser()
+                    contextualized_query = await contextualize_chain.ainvoke({
+                        "chat_history": history_for_prompt,
+                        "input": request.query
+                    })
+                    logging.info(f"Contextualized query: {contextualized_query}")
             
             # 2. Prepare context
             context_str = "\n\n".join([chunk["content"] for chunk in request.context_chunks]) if request.context_chunks else "No additional context provided."
@@ -286,7 +299,11 @@ Guidelines:
             # 5. Track cost
             prompt_tokens = len(contextualized_query.split()) + len(context_str.split())
             if request.conversation_history:
-                prompt_tokens += sum(len(m.content.split()) for m in request.conversation_history)
+                for m in request.conversation_history:
+                    if isinstance(m, dict):
+                        prompt_tokens += len(m.get('content', '').split())
+                    elif hasattr(m, 'content'):
+                        prompt_tokens += len(m.content.split())
             completion_tokens = len(str(response_content).split())
             try:
                 self.cost_tracker.track_usage(request.model, prompt_tokens, completion_tokens)
@@ -353,10 +370,21 @@ Guidelines:
         # Create streaming chain
         streaming_chain = self.environmental_prompt | llm
         
+        # Convert chat history for streaming
+        from langchain_core.messages import HumanMessage, AIMessage
+        chat_history = []
+        if request.conversation_history:
+            for msg in request.conversation_history:
+                if isinstance(msg, dict):
+                    chat_history.append(msg)
+                elif hasattr(msg, 'content'):
+                    role = "user" if isinstance(msg, HumanMessage) else "assistant"
+                    chat_history.append({"role": role, "content": msg.content})
+        
         # Stream response
         async for chunk in streaming_chain.astream({
             "context": context_str,
-            "chat_history": request.conversation_history,
+            "chat_history": chat_history,
             "input": request.query
         }):
             if hasattr(chunk, 'content'):
