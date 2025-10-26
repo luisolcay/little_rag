@@ -19,7 +19,6 @@ sys.path.append(str(Path(__file__).parent.parent))
 from core.vector.embeddings.azure_embedding_service import AzureEmbeddingService
 from core.vector.azure_search.index_manager import IndexManager
 from core.vector.azure_search.search_client import AzureSearchClient
-from core.memory.memory_manager import MemoryManager
 from core.ingest.processing import (
     AzureDocumentIntelligenceOcrProvider,
     DoclingOcrProvider
@@ -84,16 +83,10 @@ class AzureServicesManager:
         
         # 4. Memory Manager (Cosmos DB + Redis)
         try:
-            self.services["memory"] = MemoryManager(
-                cosmos_endpoint=os.getenv("AZURE_COSMOS_DB_ENDPOINT"),
-                cosmos_key=os.getenv("AZURE_COSMOS_DB_PRIMARY_KEY"),
-                cosmos_database_name=os.getenv("AZURE_COSMOS_DB_DATABASE_NAME", "collahuasi-rag"),
-                cosmos_container_name=os.getenv("AZURE_COSMOS_DB_CONTAINER_NAME", "conversations"),
-                redis_host=os.getenv("AZURE_REDIS_HOST"),
-                redis_port=int(os.getenv("AZURE_REDIS_PORT", "6380")),
-                redis_password=os.getenv("AZURE_REDIS_PRIMARY_KEY"),
-                redis_ssl=os.getenv("AZURE_REDIS_SSL", "true").lower() == "true"
-            )
+            # Import and use the singleton memory_manager
+            from core.memory.memory_manager import memory_manager
+            await memory_manager.initialize()
+            self.services["memory"] = memory_manager
             results["successful"].append("Memory Manager (Cosmos DB + Redis)")
             logger.info("✅ Memory Manager initialized")
         except Exception as e:

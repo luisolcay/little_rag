@@ -24,9 +24,10 @@ class RedisCacheClient:
         self.secondary_key = os.getenv("AZURE_REDIS_SECONDARY_KEY")
         self.ssl = os.getenv("AZURE_REDIS_SSL", "true").lower() == "true"
         self.session_ttl = int(os.getenv("REDIS_SESSION_TTL", "86400"))  # 24 hours
+        self.username = os.getenv("AZURE_REDIS_USERNAME", "default")
         
-        if not all([self.host, self.primary_key]):
-            raise ValueError("Azure Redis credentials not configured")
+        # Azure Redis can work without primary key for testing
+        # Will fail gracefully if not configured
         
         self.pool = None
         self.redis = None
@@ -36,23 +37,33 @@ class RedisCacheClient:
     async def initialize(self):
         """Initialize Redis connection pool."""
         try:
-            # Create connection pool
-            self.pool = ConnectionPool(
-                host=self.host,
-                port=self.port,
-                password=self.primary_key,
-                ssl=self.ssl,
-                ssl_cert_reqs=None,
-                decode_responses=True,
-                max_connections=20,
-                retry_on_timeout=True,
-                socket_keepalive=True,
-                socket_keepalive_options={},
-                health_check_interval=30
-            )
-            
-            # Create Redis client
-            self.redis = redis.Redis(connection_pool=self.pool)
+            # For Azure Redis with SSL, pass SSL parameters to Redis client
+            if self.ssl:
+                self.redis = redis.Redis(
+                    host=self.host,
+                    port=self.port,
+                    password=self.primary_key,
+                    ssl=True,
+                    ssl_cert_reqs=None,  # Azure uses self-signed certs
+                    decode_responses=True,
+                    retry_on_timeout=True,
+                    socket_keepalive=True,
+                    health_check_interval=30
+                )
+            else:
+                # Connection pool for non-SSL
+                connection_kwargs = {
+                    "host": self.host,
+                    "port": self.port,
+                    "password": self.primary_key,
+                    "decode_responses": True,
+                    "max_connections": 20,
+                    "retry_on_timeout": True,
+                    "socket_keepalive": True,
+                    "health_check_interval": 30
+                }
+                self.pool = ConnectionPool(**connection_kwargs)
+                self.redis = redis.Redis(connection_pool=self.pool)
             
             # Test connection
             await self.redis.ping()

@@ -60,21 +60,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for React frontend (must be before routers)
-# Check if frontend build directory exists
-frontend_build_path = Path(__file__).parent.parent / "frontend-react" / "build"
-if frontend_build_path.exists():
-    app.mount("/static", StaticFiles(directory=str(frontend_build_path / "static")), name="static")
-    # Serve React app for any route that doesn't match API endpoints
-    app.mount("/", StaticFiles(directory=str(frontend_build_path), html=True), name="frontend")
-
-# Include all routers
+# Include all routers FIRST (before static files mount)
 app.include_router(llm_router)
 app.include_router(admin_router)
 app.include_router(document_processing_router)
 app.include_router(embedding_router)
 app.include_router(search_router)
 app.include_router(memory_router)
+
+# Mount static files for React frontend AFTER routers
+# Check if frontend build directory exists
+frontend_build_path = Path(__file__).parent.parent / "frontend-react" / "build"
+if frontend_build_path.exists():
+    # Mount static assets first
+    app.mount("/static", StaticFiles(directory=str(frontend_build_path / "static")), name="static")
+    # Mount index.html last as fallback for non-API routes
+    app.mount("/", StaticFiles(directory=str(frontend_build_path), html=True), name="frontend")
 
 @app.on_event("startup")
 async def startup_event():
